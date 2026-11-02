@@ -4,7 +4,7 @@
 
 A native macOS + Android companion for sharing files, links, notes, and phone photos.
 
-**Early preview.** Android syncs while the app is open. Cross-network connections require a self-hosted relay.
+**Early release.** Android syncs while the app is open. Cross-network connections require a self-hosted relay. The Mac binary awaits Apple notarization; source builds are available.
 
 - Pair by scanning a QR code.
 - Share through a persistent shelf, Android's share menu, and Mac drag and drop.
@@ -13,7 +13,9 @@ A native macOS + Android companion for sharing files, links, notes, and phone ph
 
 ## Get started
 
-[Download a preview](https://github.com/minestero00/macDroid/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md)
+[Website and app screenshots](https://minestero00.github.io/macDroid/)
+
+[Download v0.1.0](https://github.com/minestero00/macDroid/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md)
 
 ## Repository
 

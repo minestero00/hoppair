@@ -23,17 +23,29 @@ if ! git -C "$WORK_DIR" diff --cached --quiet; then
     git -C "$WORK_DIR" -c user.name="MacDroid Publisher" -c user.email="macdroid-publisher@users.noreply.github.com" commit --quiet -m "Publish site from $SOURCE_REVISION"
     git -C "$WORK_DIR" -c credential.helper='!gh auth git-credential' push origin gh-pages
 fi
-if gh api "repos/$REPOSITORY/pages" > "$WORK_DIR/pages.json" 2> "$WORK_DIR/pages-error.log"; then
-    python3 - "$WORK_DIR/pages.json" <<'PY'
+validate_pages() {
+    python3 - "$WORK_DIR/pages.json" <<'PYCODE'
 import json,sys
 site=json.load(open(sys.argv[1]))
 if site.get('source') != {'branch':'gh-pages','path':'/'} or site.get('build_type') != 'legacy':
     raise SystemExit('Pages already uses another publishing source. Review its configuration before changing it.')
 print(site['html_url'])
-PY
+PYCODE
+}
+if gh api "repos/$REPOSITORY/pages" > "$WORK_DIR/pages.json" 2> "$WORK_DIR/pages-error.log"; then
+    validate_pages
 elif rg -q 'HTTP 404' "$WORK_DIR/pages-error.log"; then
     echo '{"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}' > "$WORK_DIR/pages-settings.json"
-    gh api --method POST "repos/$REPOSITORY/pages" --input "$WORK_DIR/pages-settings.json" --jq .html_url
+    if gh api --method POST "repos/$REPOSITORY/pages" --input "$WORK_DIR/pages-settings.json" > "$WORK_DIR/pages.json" 2> "$WORK_DIR/pages-create-error.log"; then
+        validate_pages
+    elif rg -q 'HTTP 409' "$WORK_DIR/pages-create-error.log"; then
+        # Pushing gh-pages can enable Pages before the explicit create request arrives.
+        gh api "repos/$REPOSITORY/pages" > "$WORK_DIR/pages.json"
+        validate_pages
+    else
+        cat "$WORK_DIR/pages-create-error.log" >&2
+        exit 1
+    fi
 else
     cat "$WORK_DIR/pages-error.log" >&2
     exit 1
