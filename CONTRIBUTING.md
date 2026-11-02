@@ -12,3 +12,5 @@ Preserve pending transfers and compatibility between both apps. Add tests for be
 Keep personal pairing keys, QR screenshots, signing credentials, and local configuration out of Git. Use the deterministic fixtures for protocol tests.
 
 Contributions are provided under the project's [MIT license](LICENSE). Dependencies retain their original licenses.
+
+If you have any questions of this application, send me an mail to superriaco@gmail.com
