@@ -3,7 +3,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE="${1:?Pass an existing notarytool Keychain profile.}"
 APP="$ROOT/dist/MacDroid.app"
-if ! codesign -dv "$APP" 2>&1 | grep -q 'Authority=Developer ID Application:'; then
+SIGNATURE="$(codesign -dvv "$APP" 2>&1)"
+if [[ "$SIGNATURE" != *'Authority=Developer ID Application:'* ]]; then
     echo 'Build with a Developer ID Application identity before notarizing.' >&2
     exit 1
 fi

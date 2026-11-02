@@ -62,7 +62,16 @@ Create your own persistent Android signing key once with `python3 scripts/create
 
 The packaging command builds both apps and writes a Mac ZIP, signed Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files as a GitHub prerelease after the relevant local gates pass; never upload signing keys or local configuration.
 
-For notarized Mac releases, use your own **Developer ID Application** identity and an existing `notarytool` Keychain profile:
+For notarized Mac releases, use your own **Developer ID Application** identity. With Xcode's signed-in account:
+
+```bash
+MACDROID_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/archive-mac.sh
+open dist/MacDroid.xcarchive
+```
+
+In Organizer, choose **Distribute App → Direct Distribution**. After approval, choose **Export Notarized App** and ZIP the exported app. Move an existing archive before running the script again.
+
+For command-line packaging, use an existing `notarytool` Keychain profile:
 
 ```bash
 MACDROID_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
