@@ -1,14 +1,14 @@
 {
   "version": "0.1.0",
-  "message": "v0.1.0 is being prepared. Source builds are available now.",
+  "message": "Android v0.1.0 is available. The Mac download awaits Apple notarization.",
   "mac": {
     "url": "https://github.com/minestero00/macDroid/blob/main/docs/development.md",
     "label": "Build for Mac",
     "note": "Signed download awaiting Apple notarization."
   },
   "android": {
-    "url": "https://github.com/minestero00/macDroid/releases",
-    "label": "Android release notes",
-    "note": "The signed APK will be available with v0.1.0."
+    "url": "https://github.com/minestero00/macDroid/releases/download/v0.1.0/MacDroid-0.1.0-android.apk",
+    "label": "Download APK",
+    "note": "Android 9+ \u00b7 signed release \u00b7 43.6 MiB"
   }
 }
