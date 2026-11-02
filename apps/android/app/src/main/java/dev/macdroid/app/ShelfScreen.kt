@@ -1,20 +1,16 @@
 package dev.macdroid.app
 
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.compose.ui.platform.LocalContext
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.automirrored.outlined.Notes
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -22,151 +18,153 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.ImeAction
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import dev.macdroid.app.ui.*
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MacDroidScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera: () -> Unit,
-                           onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit) {
+    onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit) {
     val state by model.ui.collectAsStateWithLifecycle()
     var pairing by rememberSaveable { mutableStateOf(false) }
+    var manual by rememberSaveable { mutableStateOf(false) }
     var link by rememberSaveable { mutableStateOf("") }
     var draft by rememberSaveable { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
+    var searching by rememberSaveable { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf("All") }
-    var manual by rememberSaveable { mutableStateOf(false) }
+    var attachments by rememberSaveable { mutableStateOf(false) }
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val searchFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val copy: (String) -> Unit = { text -> onCopy(text); scope.launch { snackbar.showSnackbar("Copied") } }
+    val closeSearch: () -> Unit = { searching = false; search = ""; focusManager.clearFocus(); keyboard?.hide() }
+    val showComposer = state.paired || state.entries.isNotEmpty()
+    LaunchedEffect(state.entries, selectedId) {
+        if (selectedId != null && state.entries.none { it.id == selectedId }) selectedId = null
+    }
     val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
         result.contents?.let { scanned -> model.pair(scanned) { pairing = false; link = "" } }
     }
     val launchScan: () -> Unit = {
-        scanner.launch(ScanOptions().setCaptureActivity(QrScannerActivity::class.java).setDesiredBarcodeFormats(ScanOptions.QR_CODE).setOrientationLocked(false)
-            .setPrompt("Point your camera at the QR code in MacDroid").setBeepEnabled(false))
+        scanner.launch(ScanOptions().setCaptureActivity(QrScannerActivity::class.java).setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+            .setOrientationLocked(false).setPrompt("Point your camera at the QR code in MacDroid").setBeepEnabled(false))
     }
     val context = LocalContext.current
-    val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) launchScan() else model.cameraDenied()
     }
     val scan: () -> Unit = {
-        if (ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) == android.content.pm.PackageManager.PERMISSION_GRANTED) launchScan()
-        else cameraPermission.launch(android.Manifest.permission.CAMERA)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) launchScan()
+        else permission.launch(Manifest.permission.CAMERA)
     }
-    val colors = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF81D5C8), secondary = Color(0xFFB5CCC6))
-        else lightColorScheme(primary = Color(0xFF087B6F), secondary = Color(0xFF4A635E), background = Color(0xFFF6FAF8), surface = Color(0xFFF6FAF8))
-    MaterialTheme(colorScheme = colors) {
+    BackHandler(enabled = searching && !pairing && !attachments && selectedId == null, onBack = closeSearch)
+    MacDroidTheme {
         Scaffold(
-            topBar = { TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) { Image(painterResource(R.drawable.macdroid_brand), null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp))); Column { Text("MacDroid", fontWeight = FontWeight.Bold); Text("Two devices. One flow.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) } } },
-                actions = { IconButton(onClick = { pairing = true }) { Icon(Icons.Outlined.Link, "Mac Connection") } }) },
+            containerColor = MaterialTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbar) },
+            topBar = {
+                Column {
+                    ShelfToolbar(searching, showComposer,
+                        onSearch = { if (searching) closeSearch() else searching = true }, onConnection = { pairing = true })
+                    if (searching && showComposer) {
+                        LaunchedEffect(Unit) { searchFocus.requestFocus() }
+                        Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                            contentAlignment = Alignment.Center) {
+                            OutlinedTextField(search, { search = it }, label = { Text("Search your shelf") },
+                                leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                                modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 12.dp).focusRequester(searchFocus),
+                                singleLine = true, shape = RoundedCornerShape(18.dp),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                                colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface, unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
+                        }
+                    }
+                }
+            },
             bottomBar = {
-                Surface(tonalElevation = 2.dp) {
-                    Column(Modifier.navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text("Text or link") }, modifier = Modifier.weight(1f), maxLines = 4)
-                            FilledIconButton(onClick = { model.addText(draft) { draft = "" } }, enabled = draft.isNotBlank() && !state.busy, modifier = Modifier.size(48.dp)) { Icon(Icons.Outlined.ArrowUpward, "Add to Shelf") }
-                        }
-                        Text(state.status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    }
+                if (showComposer) {
+                    ShelfComposer(draft, { draft = it }, state.busy, onAttach = { attachments = true },
+                        onSend = { model.addText(draft) { draft = "" } })
                 }
-            }
+            },
+            contentWindowInsets = WindowInsets.safeDrawing.only(
+                if (showComposer) WindowInsetsSides.Horizontal else WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         ) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                item {
-                    Text("Shared Shelf", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("From your phone to your Mac, and back.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                item {
-                    ElevatedCard(onClick = { pairing = true }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Outlined.LaptopMac, null, tint = MaterialTheme.colorScheme.primary)
-                            Column(Modifier.weight(1f)) {
-                                Text(if (state.paired) "My Mac" else "Connect your Mac", fontWeight = FontWeight.SemiBold)
-                                Text(if (state.online) "Connected · syncs while the app is open" else if (state.paired) "Reconnecting" else "Scan once to connect your devices", style = MaterialTheme.typography.bodySmall)
-                            }
-                            Icon(Icons.Outlined.ChevronRight, null)
-                        }
-                    }
-                }
-                if (state.cameraRequest != null) item {
-                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Your Mac requested a photo", fontWeight = FontWeight.Bold)
-                            Text("Your photo will be added to the shared shelf.")
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { model.dismissCamera(); onCamera() }) { Text("Open Camera") }
-                                TextButton(onClick = model::dismissCamera) { Text("Close") }
+            BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+                val gutter = if (maxWidth >= 600.dp) 32.dp else 24.dp
+                val compact = maxHeight < 400.dp
+                val contentWidth = Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.TopCenter)
+                LazyColumn(contentWidth, contentPadding = PaddingValues(start = gutter, end = gutter, top = 12.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (!state.paired && !searching) {
+                        item { WelcomePanel(state.busy, onScan = scan, onManual = { manual = true; pairing = true }) }
+                    } else if (state.paired && !searching) {
+                        item {
+                            Row(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("Your shelf", style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+                                    modifier = Modifier.weight(1f).semantics { heading() })
+                                Text(state.entries.size.toString() + if (state.entries.size == 1) " item" else " items",
+                                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                        if (!compact) item { ConnectionCard(state, onClick = { pairing = true }) }
                     }
-                }
-                if (!state.paired) item {
-                    Button(onClick = scan, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy) {
-                        Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("Scan QR to connect")
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Open “Connect Phone” on your Mac to show the QR code.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick = onFiles, modifier = Modifier.weight(1f), enabled = !state.busy) { Icon(Icons.Outlined.UploadFile, null); Spacer(Modifier.width(6.dp)); Text("Files") }
-                        OutlinedButton(onClick = onCamera, modifier = Modifier.weight(1f), enabled = !state.busy) { Icon(Icons.Outlined.PhotoCamera, null); Spacer(Modifier.width(6.dp)); Text("Camera") }
-                    }
-                }
-                item { OutlinedTextField(search, { search = it }, label = { Text("Search the shelf") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        for (name in listOf("All", "Files", "Waiting")) FilterChip(selected = filter == name, onClick = { filter = name }, label = { Text(name) })
-                    }
-                    if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                }
-                val visible = state.entries.filter { entry ->
-                    (filter != "Files" || entry.kind == "file") && (filter != "Waiting" || entry.pending) &&
-                        (search.isBlank() || "${entry.title} ${entry.text.orEmpty()}".contains(search, ignoreCase = true))
-                }.sortedByDescending { it.pinned }
-                if (visible.isEmpty()) item {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Icon(Icons.Outlined.Inbox, null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
-                        Text(if (search.isNotBlank()) "No matching items" else "Your shelf is empty", style = MaterialTheme.typography.titleMedium)
-                        Text("Add files, text, or links.\nThey will appear on your connected Mac.", style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    }
-                }
-                items(visible, key = { it.id }) { entry ->
-                    OutlinedCard(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
-                                Icon(if (entry.kind == "file") Icons.Outlined.Description else if (entry.kind == "link") Icons.Outlined.Link else Icons.AutoMirrored.Outlined.Notes, null, tint = MaterialTheme.colorScheme.primary)
-                                Text(entry.title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                if (entry.pinned) Icon(Icons.Outlined.PushPin, "Pinned on Mac")
-                            }
-                            entry.text?.takeIf { it != entry.title }?.let { Text(it, maxLines = 4, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (entry.pending) "Pending" else "${entry.json.optString("source")} · Delivered", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                                if (entry.text != null) TextButton(onClick = { onCopy(entry.text!!) }) { Text("Copy") }
-                                if (entry.kind != "text") TextButton(onClick = { onOpen(entry) }) { Text("Open") }
+                    if (state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                    state.cameraRequest?.let {
+                        item {
+                            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("A photo for your Mac", style = MaterialTheme.typography.titleMedium)
+                                    Text("Your Mac requested a photo. Open the camera when you're ready.", style = MaterialTheme.typography.bodyMedium)
+                                    Button(onClick = { model.dismissCamera(); onCamera() }, modifier = Modifier.fillMaxWidth()) { Text("Open camera") }
+                                    TextButton(onClick = model::dismissCamera, modifier = Modifier.fillMaxWidth()) { Text("Not now") }
+                                }
                             }
                         }
                     }
+                    if (state.paired || state.entries.isNotEmpty()) {
+                        item { ShelfFilters(filter, state.entries.count { it.pending }, onSelect = { filter = it }) }
+                        val visible = state.entries.filter { entry ->
+                            when (filter) { "Files" -> entry.kind == "file"; "Notes" -> entry.kind == "text"; "Links" -> entry.kind == "link"; "Waiting" -> entry.pending; else -> true } &&
+                                (search.isBlank() || (entry.title + " " + entry.text.orEmpty()).contains(search, ignoreCase = true))
+                        }.sortedByDescending { it.pinned }
+                        if (visible.isEmpty()) item {
+                            EmptyShelf(search.isNotBlank() || filter != "All", filter == "Waiting" && search.isBlank() && state.entries.none { it.pending })
+                        }
+                        items(visible, key = { it.id }) { entry ->
+                            ShelfItem(entry, onDetails = { selectedId = entry.id }, onCopy = copy, onOpen = onOpen)
+                        }
+                    }
                 }
-                item { Text("Up to 8 MiB per file · direct local transfer", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
-        if (pairing) AlertDialog(onDismissRequest = { if (!state.busy) { pairing = false; link = "" } },
-            title = { Text(if (state.paired) "Mac Connection" else "Connect your Mac") },
-            text = { Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Open “Connect Phone” on your Mac, then scan its QR code. Use the same network unless a relay is configured.")
-                Button(onClick = scan, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !state.busy) {
-                    Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(8.dp)); Text("Scan QR to connect")
-                }
-                Text("The scanner needs camera access. You can paste a pairing link instead.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { manual = !manual }) { Text(if (manual) "Hide" else "Use a pairing link") }
-                if (manual) OutlinedTextField(link, { link = it }, label = { Text("Pairing link from your Mac") }, modifier = Modifier.fillMaxWidth(), maxLines = 4, enabled = !state.busy)
-                if (state.busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Connecting to your Mac…", style = MaterialTheme.typography.bodySmall) }
-            } },
-            confirmButton = { if (manual) TextButton(onClick = { model.pair(link) { link = ""; pairing = false } }, enabled = link.isNotBlank() && !state.busy) { Text("Connect") } },
-            dismissButton = { TextButton(onClick = { pairing = false; link = "" }, enabled = !state.busy) { Text("Close") } })
-        state.error?.let { error -> AlertDialog(onDismissRequest = model::clearError, title = { Text("Could Not Complete the Action") }, text = { Text(error) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } }) }
+        if (pairing) ConnectionSheet(state, manual, link, { link = it }, onManual = { manual = !manual }, onScan = scan,
+            onPair = { model.pair(link) { pairing = false; link = "" } }, onDismiss = { pairing = false })
+        if (attachments) AttachmentSheet(
+            onFiles = { attachments = false; onFiles() }, onCamera = { attachments = false; onCamera() }, onDismiss = { attachments = false })
+        state.entries.firstOrNull { it.id == selectedId }?.let { entry ->
+            ItemDetailsSheet(entry, onCopy = onCopy, onOpen = onOpen, onDismiss = { selectedId = null })
+        }
+        state.error?.let { error ->
+            AlertDialog(onDismissRequest = model::clearError, title = { Text("Something needs your attention") }, text = { Text(error) },
+                confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
+        }
     }
 }

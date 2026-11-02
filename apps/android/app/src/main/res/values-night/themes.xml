@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.MacDroid" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">@color/launcher_background</item>
+    </style>
+</resources>

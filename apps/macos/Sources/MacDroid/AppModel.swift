@@ -8,6 +8,7 @@ import Darwin
 
 @MainActor
 final class AppModel: ObservableObject {
+    let isScreenshotMode = Bundle.main.bundleIdentifier == "dev.macdroid.screenshots"
     @Published var preparing = true
     @Published var items: [ShelfItem] = []
     @Published var message = "Preparing your connection"
@@ -26,6 +27,19 @@ final class AppModel: ObservableObject {
     @Published var addresses = AppModel.localAddresses()
     @Published var selectedAddress = ""
     init() {
+        if isScreenshotMode {
+            preparing = false
+            relayAddress = ""
+            message = "Sample content · no devices connected"
+            items = [
+                ShelfItem(kind: "text", title: "A few things for tomorrow",
+                          text: "Pick up the design where you left off. Keep it simple, keep it useful.", source: "Android", pinned: true),
+                ShelfItem(kind: "file", title: "Project brief.txt", filename: "Project brief.txt", mime: "text/plain", size: 24576, source: "Android"),
+                ShelfItem(kind: "link", title: "A little inspiration", text: "https://developer.android.com/design", source: "Mac"),
+                ShelfItem(kind: "text", title: "Coffee, then a little planning.", text: "Coffee, then a little planning.", source: "Android")
+            ]
+            return
+        }
         selectedAddress = addresses.first ?? ""
         do {
             let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
@@ -62,6 +76,12 @@ final class AppModel: ObservableObject {
         guard key.count == 32 else { return "" }
         let hash = SHA256.hash(data: Data(RelayIdentity.auth(key: key).utf8)).map { String(format: "%02x", $0) }.joined()
         return "{\"\(relayRoom)\":\"\(hash)\"}"
+    }
+    func openCommands() {
+        if showPairing {
+            showPairing = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showCommands = true }
+        } else { showCommands = true }
     }
     func configureRelay(_ input: String? = nil) {
         let address = (input ?? relayAddress).trimmingCharacters(in: .whitespacesAndNewlines)

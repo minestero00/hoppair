@@ -44,14 +44,15 @@ struct ShelfView: View {
                 Spacer()
                 VStack(alignment: .leading, spacing: 12) {
                     Label("My Devices", systemImage: "laptopcomputer").font(.caption.bold()).foregroundStyle(.secondary)
-                    HStack { Image(systemName: "desktopcomputer"); Text("This Mac"); Spacer(); Text(model.port > 0 || model.relayConnected ? "Ready" : "Preparing").font(.caption).foregroundStyle(.secondary) }
+                    HStack { Image(systemName: "desktopcomputer"); Text("This Mac"); Spacer(); Text(model.isScreenshotMode ? "Preview" : model.port > 0 || model.relayConnected ? "Ready" : "Preparing").font(.caption).foregroundStyle(.secondary) }
                     TimelineView(.periodic(from: .now, by: 3)) { context in
                         let online = model.lastSeen.map { context.date.timeIntervalSince($0) < 12 } ?? false
                         HStack { Image(systemName: "smartphone"); Text("Android"); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? accent : .secondary) }
                     }
                     Button("Connect Phone", systemImage: "link") { model.showPairing = true }.frame(maxWidth: .infinity)
                 }.padding(14).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
-                Text("Direct connection on your local network").font(.caption).foregroundStyle(.secondary)
+                Text(model.isScreenshotMode ? "Sample content" : model.relayConnected ? "Connected across networks" : model.relayAddress.isEmpty ? "Direct connection on your local network" : "Connecting to your relay")
+                    .font(.caption).foregroundStyle(.secondary)
             }.padding(18).navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
@@ -61,7 +62,7 @@ struct ShelfView: View {
                         Text("From your phone to your Mac, and back.").foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button { model.showCommands = true } label: { Label("Commands  ⌘K", systemImage: "command") }.controlSize(.large)
+                    Button { model.openCommands() } label: { Label("Commands  ⌘K", systemImage: "command") }.controlSize(.large)
                 }.padding(28)
                 HStack(spacing: 10) {
                     action("Add File", symbol: "arrow.up.doc", action: model.chooseFiles)

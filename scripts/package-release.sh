@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:?Usage: scripts/package-release.sh 0.1.0-alpha.1}"
+VERSION="${1:?Usage: scripts/package-release.sh 0.1.0}"
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
-    echo 'Use a semantic version, such as 0.1.0-alpha.1.' >&2
+    echo 'Use a semantic version, such as 0.1.0.' >&2
     exit 1
 fi
 "$ROOT/scripts/build-mac.sh"

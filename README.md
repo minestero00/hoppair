@@ -21,6 +21,7 @@ A native macOS + Android companion for sharing files, links, notes, and phone ph
 apps/macos/       SwiftUI app and shared Swift protocol code
 apps/android/     Kotlin / Jetpack Compose app
 services/relay/   Cloudflare Worker and Durable Object
+site/             Static GitHub Pages website
 assets/app-icon/  Editable icon source and launcher artwork
 scripts/          Build, test, and deployment commands
 docs/             Installation, development, and protocol guides
