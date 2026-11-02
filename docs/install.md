@@ -14,7 +14,7 @@ Requires macOS 14 or later on Apple silicon. Preview builds are ad-hoc signed an
 1. Download the APK on your phone.
 2. Open it and allow installation from that source when Android asks.
 
-Requires Android 9 or later. Preview APKs use a development signing key; they are not Play Store releases.
+Requires Android 9 or later. Release APKs use a dedicated signing key; no Play Store account is needed for personal APK installation. Some regions have additional [developer verification requirements](https://developer.android.com/developer-verification).
 
 ## Pair
 

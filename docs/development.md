@@ -58,4 +58,16 @@ Real-phone QR/camera, LTE, sleep/wake, permissions, accessibility, and battery b
 ./scripts/package-release.sh 0.1.0-alpha.1
 ```
 
-This builds both apps and writes a Mac ZIP, Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files as a GitHub prerelease after the relevant local gates pass; never upload signing keys or local configuration.
+Create your own persistent Android signing key once with `python3 scripts/create-android-signing.py`. It is stored under `~/.config/macdroid/signing/`, outside Git; back up both files. Use `MACDROID_ANDROID_SIGNING_FILE` to select another configuration. Local debug APKs and signed release APKs use different keys and cannot update one another.
+
+The packaging command builds both apps and writes a Mac ZIP, signed Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files as a GitHub prerelease after the relevant local gates pass; never upload signing keys or local configuration.
+
+For notarized Mac releases, use your own **Developer ID Application** identity and an existing `notarytool` Keychain profile:
+
+```bash
+MACDROID_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+MACDROID_NOTARY_PROFILE=macdroid-notary \
+./scripts/package-release.sh 0.1.0-alpha.1
+```
+
+Create the profile yourself with `xcrun notarytool store-credentials macdroid-notary`; credentials stay outside Git. The packaging script enables hardened runtime, waits for notarization, staples the ticket, and then archives the app.

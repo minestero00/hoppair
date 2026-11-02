@@ -7,6 +7,17 @@ android {
     namespace = "dev.macdroid.app"
     compileSdk = 36
     defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 2; versionName = "0.1.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    val signingPath = providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
+    if (signingPath != null) {
+        val values = groovy.json.JsonSlurper().parse(file(signingPath)) as Map<*, *>
+        val releaseKey = signingConfigs.create("releaseKey") {
+            storeFile = file(values["storeFile"] as String)
+            storePassword = values["storePassword"] as String
+            keyAlias = values["keyAlias"] as String
+            keyPassword = values["keyPassword"] as String
+        }
+        buildTypes.getByName("release").signingConfig = releaseKey
+    }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }

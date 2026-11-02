@@ -34,5 +34,10 @@ fi
 mkdir -p "$APP/Contents/Resources/Licenses"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/Licenses/MIT.txt"
 cp "$ROOT/NOTICE" "$APP/Contents/Resources/Licenses/NOTICE.txt"
-codesign --force --sign "${MACDROID_SIGN_IDENTITY:--}" "$APP"
+SIGNING_IDENTITY="${MACDROID_SIGN_IDENTITY:--}"
+if [[ "$SIGNING_IDENTITY" == - ]]; then
+    codesign --force --sign - "$APP"
+else
+    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$APP"
+fi
 printf '\nBuilt %s\n' "$APP"
