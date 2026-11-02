@@ -1,0 +1,21 @@
+{
+  "name": "macdroid-relay",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "types": "wrangler types",
+    "check": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.mjs",
+    "precheck": "wrangler types"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "latest",
+    "wrangler": "latest",
+    "ws": "latest"
+  },
+  "license": "MIT"
+}

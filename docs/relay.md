@@ -1,0 +1,39 @@
+# Cross-network relay
+
+The optional Cloudflare Worker connects your Mac and phone across different networks. Device identity comes from the pairing key, so changing the Mac's location or IP does not require pairing again. Both apps still need to be running; the relay does not store offline files.
+
+SQLite Durable Objects are available on Cloudflare's free plan, subject to [usage limits and pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/). Start there for personal use and check actual usage. The scripts do not change plans or billing settings.
+
+## Deploy your own
+
+1. In the Mac app, open **Connect Phone → More connection options → Copy Relay Registration**. Save the JSON outside the repository.
+2. Sign in to your Cloudflare account and deploy:
+
+```bash
+cd services/relay
+npm ci
+npx wrangler login
+cd ../..
+./scripts/deploy-relay.sh /absolute/path/to/registration.json
+```
+
+3. Change the deployed address from `https://…workers.dev` to `wss://…workers.dev`. Enter it under the Mac's **Relay Settings**, then choose **Apply**.
+4. Once connected, scan the updated QR on Android. Subsequent network changes reuse the same pairing.
+
+Use the deployment script with the same registration file for updates. A plain deployment uses an empty registration map and rejects devices. To include the address in your own Mac build:
+
+```bash
+MACDROID_RELAY_URL=wss://your-relay.workers.dev ./scripts/build-mac.sh
+```
+
+## Security and operation
+
+- Only pre-registered device IDs and authentication hashes are accepted. Knowing a room ID cannot claim it.
+- Contents remain AES-GCM ciphertext. The relay does not receive the content key or persist files; operators can see connection metadata.
+- One Mac and one phone connect per room. Requests are sequential. The Mac reconnects after failure; Android retries while open.
+- Per-connection guards allow 240 messages and 96 MiB per minute. They are not account-wide billing quotas.
+- Remove a registration and redeploy to revoke it. In-app pairing-key rotation is not implemented yet.
+
+The service is intended for personal use, not a public multi-user relay. Deployment and real LTE/network-change behavior need validation beyond local emulation.
+
+For local testing, see [development.md](development.md). Protocol details are in [architecture.md](architecture.md).

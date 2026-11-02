@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "macdroid-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "DeviceRoom" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeviceRoom"] }],
+  "vars": { "ROOM_CREDENTIALS": "{}" },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}

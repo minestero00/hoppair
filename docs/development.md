@@ -1,0 +1,61 @@
+# Build and test
+
+Use the repository root for the commands below. Outputs go to `dist/`; test receipts go to `artifacts/`. Both directories are ignored by Git.
+
+## macOS
+
+Requires Xcode with Swift and Icon Composer's asset compiler, plus Python 3. Tested with Xcode 27.1; `xcrun --find actool` should resolve the asset compiler.
+
+```bash
+./scripts/build-mac.sh
+open dist/MacDroid.app
+swift test --package-path apps/macos
+```
+
+Local builds use ad-hoc signing. Set `MACDROID_SIGN_IDENTITY` to use your own signing identity. Rebuilt development apps may require renewed Keychain approval.
+
+## Android
+
+Requires JDK 17 and Android SDK 36. Set `ANDROID_HOME` or `apps/android/local.properties` if SDK discovery fails.
+
+```bash
+./scripts/build-android.sh
+adb install -r dist/MacDroid-android-debug.apk
+```
+
+The script builds the APK and runs unit tests and lint. Open `apps/android/` in Android Studio to work on the app.
+
+## Relay
+
+Requires Node.js 22 or later.
+
+```bash
+cd services/relay
+npm ci
+npm run check
+cd ../..
+python3 scripts/test-relay.py --protocol-only
+```
+
+The check generates Worker types before running TypeScript. The local gate starts and stops its own Worker; it does not deploy or use personal registrations.
+
+## Both apps together
+
+Start an Android emulator, get its serial from `adb devices`, and substitute it below:
+
+```bash
+./scripts/test-peer.sh emulator-5580
+python3 scripts/test-relay.py --serial emulator-5580
+```
+
+The first gate tests direct TCP. The second forces relay fallback with the direct address unreachable. Both check text/binary transfer, lost-ack retries, and Android outbox persistence using isolated fixtures.
+
+Real-phone QR/camera, LTE, sleep/wake, permissions, accessibility, and battery behavior still require manual validation. Do not report emulator tests as hardware coverage.
+
+## Package a preview
+
+```bash
+./scripts/package-release.sh 0.1.0-alpha.1
+```
+
+This builds both apps and writes a Mac ZIP, Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files as a GitHub prerelease after the relevant local gates pass; never upload signing keys or local configuration.
