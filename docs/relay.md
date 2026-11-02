@@ -34,6 +34,6 @@ MACDROID_RELAY_URL=wss://your-relay.workers.dev ./scripts/build-mac.sh
 - Per-connection guards allow 240 messages and 96 MiB per minute. They are not account-wide billing quotas.
 - Remove a registration and redeploy to revoke it. In-app pairing-key rotation is not implemented yet.
 
-The service is intended for personal use, not a public multi-user relay. Deployment and real LTE/network-change behavior need validation beyond local emulation.
+The service is intended for personal use, not a public multi-user relay. Verify your deployed endpoint, then test on a real phone over LTE and after network changes; local emulation does not cover these conditions.
 
 For local testing, see [development.md](development.md). Protocol details are in [architecture.md](architecture.md).
