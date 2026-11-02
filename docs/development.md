@@ -87,4 +87,4 @@ Create the profile yourself with `xcrun notarytool store-credentials macdroid-no
 
 ## Website
 
-Run `npm ci --prefix tests/site`, `npx --prefix tests/site playwright install chromium`, and start the preview server described in [site/README.md](../site/README.md). Then run `npm test --prefix tests/site` to check responsive layouts, screenshot previews, keyboard behavior, and static fallbacks.
+Run `npm ci --prefix tests/site`, `npx --prefix tests/site playwright install chromium`, and start the preview server described in [site/README.md](../site/README.md). Then run `npm test --prefix tests/site` to check responsive layouts, screenshot previews, keyboard behavior, and static fallbacks. Set `MACDROID_SITE_URL=https://minestero00.github.io/macDroid/` to check the published site.
