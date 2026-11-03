@@ -33,6 +33,10 @@ class QrScannerUiTest {
                 compose.waitUntil(20_000) {
                     compose.onAllNodesWithText("Point at your Mac’s QR. Tap to focus or pinch to zoom.").fetchSemanticsNodes().isNotEmpty()
                 }
+            } else {
+                compose.onNodeWithText("Allow camera access in Settings and reopen this scanner, or use a pairing link.")
+                    .performScrollTo().assertIsDisplayed()
+                compose.onNodeWithText("1×").assertIsNotEnabled()
             }
             awaitCameraStream(scenario)
             assertGuideCentered()
@@ -82,6 +86,9 @@ class QrScannerUiTest {
     }
     private fun capture(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.waitForIdleSync()
+        // Compose can be idle before the platform's activity-enter transition finishes.
+        android.os.SystemClock.sleep(500)
         val image = instrumentation.uiAutomation.takeScreenshot()
         File(instrumentation.targetContext.getExternalFilesDir(null), name).outputStream().use {
             image.compress(Bitmap.CompressFormat.PNG, 100, it)
