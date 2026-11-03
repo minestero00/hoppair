@@ -30,15 +30,26 @@ internal const val MAX_FRAME = 12 * 1024 * 1024
 internal data class Pairing(val host: String, val port: Int, val key: ByteArray, val relay: String? = null) {
     companion object {
         fun parse(link: String): Pairing {
-            val uri = URI(link.trim())
-            require(uri.scheme == "macdroid" && !uri.host.isNullOrBlank() && uri.port in 1..65535) { "Paste the pairing link from your Mac." }
+            val outer = URI(link.trim())
+            val uri = if (outer.scheme == "https") {
+                require(outer.userInfo == null && outer.port in listOf(-1, 443) &&
+                    ((outer.host == "hoppair-connect.macdroid-relay.workers.dev" && outer.path in listOf("/connect", "/connect/")) ||
+                    (outer.host == "minestero00.github.io" && outer.path == "/hoppair/connect/"))) { "Use the pairing QR code shown on your Mac." }
+                val payload = outer.rawFragment?.split("&")?.singleOrNull { it.startsWith("pair=") }?.removePrefix("pair=")
+                    ?: error("The pairing code is missing.")
+                require(payload.length <= 4096 && payload.matches(Regex("[A-Za-z0-9_-]+={0,2}"))) { "Invalid pairing code." }
+                URI(String(Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP), Charsets.UTF_8))
+            } else outer
+            require(uri.scheme in setOf("hoppair", "macdroid") && uri.userInfo == null && uri.fragment == null && uri.path in listOf("", "/") && !uri.host.isNullOrBlank() && uri.port in 1..65535) { "Paste the pairing link from your Mac." }
             val encoded = uri.rawQuery?.split("&")?.firstOrNull { it.startsWith("key=") }?.removePrefix("key=") ?: error("The pairing key is missing.")
-            val key = Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP)
+            val decodedKey = URLDecoder.decode(encoded, "UTF-8")
+            require(decodedKey.matches(Regex("[A-Za-z0-9_-]{43}=?"))) { "Invalid pairing key." }
+            val key = Base64.decode(decodedKey, Base64.URL_SAFE or Base64.NO_WRAP)
             require(key.size == 32) { "Invalid pairing key." }
             val relay = uri.rawQuery?.split("&")?.firstOrNull { it.startsWith("relay=") }?.removePrefix("relay=")?.let { URLDecoder.decode(it, "UTF-8") }
             if (relay != null) {
                 val remote = URI(relay)
-                require(remote.userInfo == null && !remote.host.isNullOrBlank() && (remote.scheme == "wss" ||
+                require(remote.userInfo == null && remote.fragment == null && !remote.host.isNullOrBlank() && (remote.scheme == "wss" ||
                     (BuildConfig.DEBUG && remote.scheme == "ws" && remote.host in listOf("127.0.0.1", "localhost", "10.0.2.2")))) { "Check the relay address." }
             }
             return Pairing(uri.host, uri.port, key, relay)
@@ -62,6 +73,7 @@ internal object PayloadCrypto {
 
 internal class PeerRejected(message: String) : Exception(message)
 
+// Stable v1 derivation labels preserve existing relay enrollment across the rename.
 internal object RelayIdentity {
     private fun derive(label: String, key: ByteArray): ByteArray = javax.crypto.Mac.getInstance("HmacSHA256").run {
         init(SecretKeySpec(key, "HmacSHA256")); doFinal(label.toByteArray())
@@ -128,7 +140,7 @@ private class RelaySocket(pairing: Pairing) : java.io.Closeable {
                 else responses.offer(Result.failure(java.io.IOException("Transfer exceeds the size limit.")))
             }
             override fun onFailure(webSocket: okhttp3.WebSocket, t: Throwable, response: Response?) {
-                val error = java.io.IOException("Could not connect through the relay. Check your Mac’s internet connection and open MacDroid.")
+                val error = java.io.IOException("Could not connect through the relay. Check your Mac’s internet connection and open Hoppair.")
                 openError = error; opened.countDown(); responses.offer(Result.failure(error))
             }
             override fun onClosed(webSocket: okhttp3.WebSocket, code: Int, reason: String) {

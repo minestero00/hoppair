@@ -1,5 +1,5 @@
 import SwiftUI
-import MacDroidCore
+import HoppairCore
 
 struct PairingView: View {
     @EnvironmentObject private var model: AppModel
@@ -9,19 +9,19 @@ struct PairingView: View {
         VStack(spacing: 20) {
             HStack {
                 Spacer()
-                Button { model.showPairing = false } label: { Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.secondary) }.buttonStyle(.plain).accessibilityLabel("Close pairing")
+                Button { model.showPairing = false } label: { Image(systemName: "xmark.circle.fill").font(.title2).foregroundStyle(.secondary) }.hoppairButton(.icon).accessibilityLabel("Close pairing")
             }
             Image(nsImage: (NSImage(named: "BrandIcon") ?? NSApplication.shared.applicationIconImage)).resizable().scaledToFit().frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 15)).accessibilityHidden(true)
             VStack(spacing: 8) {
                 Text("Scan to connect.").font(.title.bold())
-                Text("Open MacDroid on Android,\nthen choose “Scan QR to connect”.").multilineTextAlignment(.center).foregroundStyle(.secondary)
+                Text("Scan with your Android camera.\nOpen Hoppair, or install it first.").multilineTextAlignment(.center).foregroundStyle(.secondary)
             }
             if model.preparing {
                 ProgressView("Preparing your connection").frame(width: 264, height: 264)
             } else if let image = qrImage {
                 Image(nsImage: image).interpolation(.none).resizable().scaledToFit().frame(width: 224, height: 224)
                     .padding(20).background(.white, in: RoundedRectangle(cornerRadius: 16))
-                    .accessibilityLabel("Pairing QR code for MacDroid on Android")
+                    .accessibilityLabel("Pairing QR code for Hoppair on Android")
             } else {
                 VStack(spacing: 14) {
                     Image(systemName: "wifi.exclamationmark").font(.largeTitle)
@@ -49,8 +49,8 @@ struct PairingView: View {
                 }.padding(.top, 12)
             }.font(.callout)
             Text("Scan this code with your own phone only.").font(.caption).foregroundStyle(.secondary)
-            Button("Done") { model.showPairing = false }.buttonStyle(.borderedProminent).controlSize(.large).keyboardShortcut(.defaultAction)
-        }.padding(28).frame(width: 470).onAppear { model.refreshNetwork(); relayDraft = model.relayAddress }
+            Button("Done") { model.showPairing = false }.hoppairButton(.primary).keyboardShortcut(.defaultAction)
+        }.buttonStyle(HoppairButtonStyle()).padding(28).frame(width: 470).onAppear { model.refreshNetwork(); relayDraft = model.relayAddress }
     }
     private var qrImage: NSImage? {
         guard let image = PairingCode.image(for: model.pairingLink) else { return nil }

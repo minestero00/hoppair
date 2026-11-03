@@ -36,9 +36,9 @@ import java.util.Locale
 internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, onSearch: () -> Unit, onConnection: () -> Unit) {
     Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Image(painterResource(R.drawable.macdroid_brand), null, Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
+        Image(painterResource(R.drawable.hoppair_brand), null, Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
         Spacer(Modifier.width(10.dp))
-        Text("MacDroid", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text("Hoppair", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         if (canSearch) IconButton(onClick = onSearch) { Icon(if (searching) Icons.Outlined.Close else Icons.Outlined.Search, if (searching) "Close search" else "Search your shelf") }
         IconButton(onClick = onConnection) { Icon(Icons.Outlined.LaptopMac, "Mac connection") }
     }
@@ -201,7 +201,7 @@ internal fun WelcomePanel(busy: Boolean, onScan: () -> Unit, onManual: () -> Uni
         }
         TextButton(onClick = onManual, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Use a pairing link") }
         Spacer(Modifier.height(16.dp))
-        Text("On your Mac, open MacDroid → Connect Phone.", style = MaterialTheme.typography.bodySmall,
+        Text("On your Mac, open Hoppair → Connect Phone.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }

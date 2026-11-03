@@ -49,12 +49,34 @@ class ShelfUiTest {
                 if (source.exists()) { check(source.renameTo(File(backup, name))); moved += name }
             }
             backedUp = true
-            PairingVault(context).save("macdroid://10.0.2.2:49273?key=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc")
+            PairingVault(context).save("hoppair://10.0.2.2:49273?key=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc")
             shell("settings put secure show_ime_with_hard_keyboard 0")
             shell("cmd uimode night no")
+            shell("settings put system font_scale 1.0")
+            shell("wm size reset")
+            shell("wm density reset")
             scenario = ActivityScenario.launch(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             screenshot(screenshots, "startup")
             waitText("A few things for tomorrow")
+            var launchIntent: Intent? = null
+            scenario.onActivity { launchIntent = Intent(it.intent) }
+            val originalPairing = PairingVault(context).load()
+            val invitePayload = android.util.Base64.encodeToString(checkNotNull(originalPairing).toByteArray(), android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+            val incoming = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://hoppair-connect.macdroid-relay.workers.dev/connect/#pair=$invitePayload"))
+                .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            scenario.onActivity { it.startActivity(incoming) }
+            waitText("Connect to your Mac?")
+            tapText("Cancel")
+            assertEquals(originalPairing, PairingVault(context).load())
+            scenario.onActivity { it.startActivity(incoming) }
+            waitText("Connect to your Mac?")
+            compose.onNodeWithText("Connect", substring = false).performClick()
+            compose.waitUntil(timeoutMillis = 15000) { PairingVault(context).load() == incoming.dataString }
+            compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()
+            waitText("Mac connected")
+            assertArrayEquals(Pairing.parse(checkNotNull(originalPairing)).key, Pairing.parse(checkNotNull(PairingVault(context).load())).key)
+            // ActivityScenario recreates by matching the original launch intent.
+            scenario.onActivity { it.intent = checkNotNull(launchIntent) }
             screenshot(screenshots, "shelf-light")
             tapText("A few things for tomorrow")
             waitText("Keep it simple", contains = true)
@@ -119,7 +141,7 @@ class ShelfUiTest {
             waitText("Make the connection")
             screenshot(screenshots, "connection")
         } finally {
-            scenario?.close()
+            scenario?.let { active -> runCatching { active.close() }.onFailure { println("Scenario cleanup: " + it.message) } }
             shell("wm size reset")
             shell("wm density reset")
             shell("settings put system font_scale " + oldScale)

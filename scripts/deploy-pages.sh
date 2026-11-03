@@ -4,10 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 if [[ -n "$(git status --porcelain)" ]]; then echo 'Commit or stash changes before publishing the site.' >&2; exit 1; fi
-REPOSITORY="${MACDROID_GITHUB_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
+REPOSITORY="${HOPPAIR_GITHUB_REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}"
 REMOTE="$(git remote get-url origin)"
 SOURCE_REVISION="$(git rev-parse HEAD)"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/macdroid-pages.XXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hoppair-pages.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
 git init --quiet "$WORK_DIR"
 git -C "$WORK_DIR" remote add origin "$REMOTE"
@@ -20,7 +20,7 @@ fi
 rsync -a --delete --exclude=.git "$ROOT/site/" "$WORK_DIR/"
 git -C "$WORK_DIR" add --all
 if ! git -C "$WORK_DIR" diff --cached --quiet; then
-    git -C "$WORK_DIR" -c user.name="MacDroid Publisher" -c user.email="macdroid-publisher@users.noreply.github.com" commit --quiet -m "Publish site from $SOURCE_REVISION"
+    git -C "$WORK_DIR" -c user.name="Hoppair Publisher" -c user.email="hoppair-publisher@users.noreply.github.com" commit --quiet -m "Publish site from $SOURCE_REVISION"
     git -C "$WORK_DIR" -c credential.helper='!gh auth git-credential' push origin gh-pages
 fi
 validate_pages() {

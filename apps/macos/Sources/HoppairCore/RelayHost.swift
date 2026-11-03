@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 
+// Wire-protocol identifiers remain stable for devices paired before the Hoppair rename.
 public enum RelayIdentity {
     private static func derive(_ label: String, key: Data) -> Data {
         Data(HMAC<SHA256>.authenticationCode(for: Data(label.utf8), using: SymmetricKey(data: key)))

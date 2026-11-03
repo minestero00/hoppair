@@ -7,7 +7,7 @@ type SocketState = { inFlight: boolean; room: string; credentialHash: string; ro
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/health") return Response.json({ ok: true, service: "macdroid-relay" });
+    if (url.pathname === "/health") return Response.json({ ok: true, service: "hoppair-relay" });
     const room = url.pathname.match(/^\/room\/([^/]+)$/)?.[1];
     if (!room || !ROOM.test(room)) return new Response("Not found", { status: 404 });
     // Private alpha: reject unknown rooms before creating a Durable Object.

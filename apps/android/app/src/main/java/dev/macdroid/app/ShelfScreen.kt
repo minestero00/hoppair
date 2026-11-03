@@ -35,7 +35,7 @@ import dev.macdroid.app.ui.*
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun MacDroidScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera: () -> Unit,
+internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera: () -> Unit,
     onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit) {
     val state by model.ui.collectAsStateWithLifecycle()
     var pairing by rememberSaveable { mutableStateOf(false) }
@@ -63,7 +63,7 @@ internal fun MacDroidScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera
     }
     val launchScan: () -> Unit = {
         scanner.launch(ScanOptions().setCaptureActivity(QrScannerActivity::class.java).setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            .setOrientationLocked(false).setPrompt("Point your camera at the QR code in MacDroid").setBeepEnabled(false))
+            .setOrientationLocked(false).setPrompt("Point your camera at the QR code in Hoppair").setBeepEnabled(false))
     }
     val context = LocalContext.current
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -74,7 +74,7 @@ internal fun MacDroidScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera
         else permission.launch(Manifest.permission.CAMERA)
     }
     BackHandler(enabled = searching && !pairing && !attachments && selectedId == null, onBack = closeSearch)
-    MacDroidTheme {
+    HoppairTheme {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },

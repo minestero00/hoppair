@@ -3,12 +3,12 @@ import AppKit
 import Security
 import CryptoKit
 import UniformTypeIdentifiers
-import MacDroidCore
+import HoppairCore
 import Darwin
 
 @MainActor
 final class AppModel: ObservableObject {
-    let isScreenshotMode = Bundle.main.bundleIdentifier == "dev.macdroid.screenshots"
+    let isScreenshotMode = Bundle.main.bundleIdentifier == "dev.hoppair.screenshots"
     @Published var preparing = true
     @Published var items: [ShelfItem] = []
     @Published var message = "Preparing your connection"
@@ -21,7 +21,7 @@ final class AppModel: ObservableObject {
     private var store: ShelfStore?
     private var server: BridgeServer?
     private var relayHost: RelayHost?
-    @Published var relayAddress = UserDefaults.standard.string(forKey: "relayAddress") ?? (Bundle.main.object(forInfoDictionaryKey: "MacDroidRelayURL") as? String ?? "")
+    @Published var relayAddress = UserDefaults.standard.string(forKey: "relayAddress") ?? (Bundle.main.object(forInfoDictionaryKey: "HoppairRelayURL") as? String ?? Bundle.main.object(forInfoDictionaryKey: "MacDroidRelayURL") as? String ?? "")
     @Published var relayConnected = false
     private var key = Data()
     @Published var addresses = AppModel.localAddresses()
@@ -34,7 +34,7 @@ final class AppModel: ObservableObject {
             items = [
                 ShelfItem(kind: "text", title: "A few things for tomorrow",
                           text: "Pick up the design where you left off. Keep it simple, keep it useful.", source: "Android", pinned: true),
-                ShelfItem(kind: "file", title: "Project brief.txt", filename: "Project brief.txt", mime: "text/plain", size: 24576, source: "Android"),
+                ShelfItem(kind: "file", title: "Hoppair icon.png", filename: "Hoppair icon.png", mime: "image/png", size: 74599, source: "Android"),
                 ShelfItem(kind: "link", title: "A little inspiration", text: "https://developer.android.com/design", source: "Mac"),
                 ShelfItem(kind: "text", title: "Coffee, then a little planning.", text: "Coffee, then a little planning.", source: "Android")
             ]
@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
         }
         selectedAddress = addresses.first ?? ""
         do {
+            // Keep the original storage and Keychain identities for in-place upgrades.
             let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
                                                   appropriateFor: nil, create: true).appendingPathComponent("MacDroid")
             store = try ShelfStore(root: root)
@@ -62,11 +63,12 @@ final class AppModel: ObservableObject {
             preparing = false
         } catch { preparing = false; self.error = "Could not prepare the connection: \(error.localizedDescription)" }
     }
-    var pairingLink: String {
+    var pairingLink: String { PairingLink.webURL(for: directPairingLink) }
+    var directPairingLink: String {
         guard key.count == 32, port > 0 || !relayAddress.isEmpty, !selectedAddress.isEmpty || !relayAddress.isEmpty else { return "" }
         let secret = key.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
         var components = URLComponents()
-        components.scheme = "macdroid"; components.host = selectedAddress.isEmpty ? "127.0.0.1" : selectedAddress; components.port = port > 0 ? Int(port) : 49271
+        components.scheme = "hoppair"; components.host = selectedAddress.isEmpty ? "127.0.0.1" : selectedAddress; components.port = port > 0 ? Int(port) : 49271
         components.queryItems = [URLQueryItem(name: "key", value: secret)]
         if !relayAddress.isEmpty { components.queryItems?.append(URLQueryItem(name: "relay", value: relayAddress)) }
         return components.string ?? ""
@@ -154,10 +156,18 @@ final class AppModel: ObservableObject {
             message = "File added to the shelf"
         }
     }
+    func previewURL(for item: ShelfItem) -> URL? {
+        guard item.kind == "file" else { return nil }
+        if isScreenshotMode { return item.mime == "image/png" ? Bundle.main.url(forResource: "BrandIcon", withExtension: "png") : nil }
+        guard let store, store.items.contains(where: { $0.id == item.id && $0.kind == "file" }) else { return nil }
+        return try? store.fileURL(item.id)
+    }
     func pin(_ item: ShelfItem) { perform { try store?.togglePin(item.id) } }
-    func copy(_ text: String) {
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
-        message = "Copied"
+    @discardableResult func copy(_ text: String) -> Bool {
+        NSPasteboard.general.clearContents()
+        let copied = NSPasteboard.general.setString(text, forType: .string)
+        if copied { message = "Copied" } else { error = "Could not copy to the clipboard. Try again." }
+        return copied
     }
     func open(_ item: ShelfItem) {
         if item.kind == "link", let text = item.text, let url = URL(string: text), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
@@ -174,7 +184,7 @@ final class AppModel: ObservableObject {
     }
     func requestCamera() {
         cameraRequest = UUID().uuidString.lowercased()
-        message = "Open MacDroid on your phone to confirm the photo request"
+        message = "Open Hoppair on your phone to confirm the photo request"
     }
     private func perform(_ work: () throws -> Void) {
         do { guard store != nil else { throw BridgeError.invalid("Could not open local storage. Please restart the app.") }; try work(); refresh() } catch { self.error = error.localizedDescription }

@@ -6,8 +6,9 @@ plugins {
 android {
     namespace = "dev.macdroid.app"
     compileSdk = 36
-    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 3; versionName = "0.1.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
-    val signingPath = providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
+    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 4; versionName = "0.1.1"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    val signingPath = providers.environmentVariable("HOPPAIR_ANDROID_SIGNING_FILE").orNull
+        ?: providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
     if (signingPath != null) {
         val values = groovy.json.JsonSlurper().parse(file(signingPath)) as Map<*, *>
         val releaseKey = signingConfigs.create("releaseKey") {

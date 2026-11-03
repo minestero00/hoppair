@@ -34,7 +34,7 @@ internal fun ConnectionSheet(state: ShelfState, manual: Boolean, link: String, o
                 Text(state.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
-            Text("Open Connect Phone in MacDroid on your Mac, then scan its QR code.", style = MaterialTheme.typography.bodyLarge)
+            Text("Open Connect Phone in Hoppair on your Mac, then scan its QR code.", style = MaterialTheme.typography.bodyLarge)
             Button(onClick = onScan, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
                 shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(16.dp)) {
                 Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")

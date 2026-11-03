@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.MacDroid" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Hoppair" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
         <item name="android:colorAccent">@color/launcher_background</item>

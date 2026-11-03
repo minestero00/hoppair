@@ -1,6 +1,6 @@
-<p align="center"><img src="assets/app-icon/AppIcon.icon/Assets/Artwork.png" width="96" alt="MacDroid icon"></p>
+<p align="center"><img src="assets/app-icon/AppIcon.icon/Assets/Artwork.png" width="96" alt="Hoppair icon"></p>
 
-# MacDroid
+# Hoppair
 
 A native macOS + Android companion for sharing files, links, notes, and phone photos.
 
@@ -11,18 +11,21 @@ A native macOS + Android companion for sharing files, links, notes, and phone ph
 - Use the Mac menu bar and command palette; request a photo from your phone.
 - Transfer directly nearby, or use an encrypted relay when networks change.
 
+Previously published here as MacDroid. Existing installations can [update without re-pairing](docs/install.md#updating-from-macdroid).
+
 ## Get started
 
-[Website and app screenshots](https://minestero00.github.io/macDroid/)
+[Website and app screenshots](https://minestero00.github.io/hoppair/)
 
-[Download v0.1.0](https://github.com/minestero00/macDroid/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md)
+[Download apps](https://github.com/minestero00/hoppair/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md)
 
 ## Repository
 
 ```text
 apps/macos/       SwiftUI app and shared Swift protocol code
 apps/android/     Kotlin / Jetpack Compose app
-services/relay/   Cloudflare Worker and Durable Object
+services/relay/   Encrypted relay Worker and Durable Object
+services/connect/ Android app association and install handoff
 site/             Static GitHub Pages website
 assets/app-icon/  Editable icon source and launcher artwork
 scripts/          Build, test, and deployment commands

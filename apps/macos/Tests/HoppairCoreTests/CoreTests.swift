@@ -2,7 +2,7 @@ import XCTest
 import CryptoKit
 import Network
 import Vision
-@testable import MacDroidCore
+@testable import HoppairCore
 
 final class CoreTests: XCTestCase {
     private func temporaryStore() throws -> ShelfStore {
@@ -94,8 +94,23 @@ final class CoreTests: XCTestCase {
         client.start(queue: .main)
         await fulfillment(of: [done], timeout: 10)
     }
+    func testWebPairingLinkKeepsCredentialsInFragmentAndRoundTripsQR() throws {
+        let direct = "hoppair://192.168.1.12:49271?key=" + String(repeating: "A", count: 43)
+        let value = PairingLink.webURL(for: direct)
+        let url = try XCTUnwrap(URLComponents(string: value))
+        XCTAssertNil(url.query)
+        XCTAssertEqual(url.host, "hoppair-connect.macdroid-relay.workers.dev")
+        let payload = try XCTUnwrap(url.fragment?.dropFirst(5))
+        var encoded = String(payload).replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+        XCTAssertEqual(Data(base64Encoded: encoded), Data(direct.utf8))
+        let image = try XCTUnwrap(PairingCode.image(for: value))
+        let request = VNDetectBarcodesRequest(); request.symbologies = [.qr]
+        try VNImageRequestHandler(cgImage: image).perform([request])
+        XCTAssertEqual(request.results?.first?.payloadStringValue, value)
+    }
     func testPairingQRCodeDecodesToOriginalLink() throws {
-        let link = "macdroid://192.168.1.12:49271?key=fixture-key-with-url-safe-characters_1234567"
+        let link = "hoppair://192.168.1.12:49271?key=fixture-key-with-url-safe-characters_1234567"
         let image = try XCTUnwrap(PairingCode.image(for: link))
         let request = VNDetectBarcodesRequest()
         request.symbologies = [.qr]

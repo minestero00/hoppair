@@ -8,7 +8,10 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
-directory = Path.home() / ".config/macdroid/signing"
+directory = Path.home() / ".config/hoppair/signing"
+legacy = Path.home() / ".config/macdroid/signing"
+if not (directory / "android.json").exists() and (legacy / "android.json").exists():
+    directory = legacy
 directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 config = directory / "android.json"
 keystore = directory / "android-release.p12"
@@ -19,15 +22,15 @@ if config.exists() or keystore.exists():
     raise SystemExit("Incomplete signing files exist. Resolve them manually; nothing was overwritten.")
 password = secrets.token_urlsafe(36)
 # Credentials remain in the child environment, never command arguments or logs.
-environment = {**os.environ, "MACDROID_KEY_PASSWORD": password}
+environment = {**os.environ, "HOPPAIR_KEY_PASSWORD": password}
 subprocess.run([
-    "keytool", "-genkeypair", "-alias", "macdroid-release", "-keyalg", "RSA", "-keysize", "3072",
-    "-validity", "10000", "-dname", "CN=MacDroid Release", "-storetype", "PKCS12",
-    "-keystore", str(keystore), "-storepass:env", "MACDROID_KEY_PASSWORD",
-    "-keypass:env", "MACDROID_KEY_PASSWORD",
+    "keytool", "-genkeypair", "-alias", "hoppair-release", "-keyalg", "RSA", "-keysize", "3072",
+    "-validity", "10000", "-dname", "CN=Hoppair Release", "-storetype", "PKCS12",
+    "-keystore", str(keystore), "-storepass:env", "HOPPAIR_KEY_PASSWORD",
+    "-keypass:env", "HOPPAIR_KEY_PASSWORD",
 ], env=environment, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
 os.chmod(keystore, 0o600)
-value = {"storeFile": str(keystore), "storePassword": password, "keyAlias": "macdroid-release", "keyPassword": password}
+value = {"storeFile": str(keystore), "storePassword": password, "keyAlias": "hoppair-release", "keyPassword": password}
 with tempfile.NamedTemporaryFile(mode="w", dir=directory, delete=False) as output:
     json.dump(value, output)
     temporary = Path(output.name)

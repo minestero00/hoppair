@@ -1,11 +1,11 @@
 // swift-tools-version: 5.9
 import PackageDescription
 let package = Package(
-    name: "MacDroid", platforms: [.macOS(.v14)],
-    products: [.executable(name: "MacDroid", targets: ["MacDroid"])],
+    name: "Hoppair", platforms: [.macOS(.v14)],
+    products: [.executable(name: "Hoppair", targets: ["Hoppair"])],
     targets: [
-        .target(name: "MacDroidCore"),
-        .executableTarget(name: "MacDroid", dependencies: ["MacDroidCore"]),
-        .testTarget(name: "MacDroidCoreTests", dependencies: ["MacDroidCore"])
+        .target(name: "HoppairCore"),
+        .executableTarget(name: "Hoppair", dependencies: ["HoppairCore"]),
+        .testTarget(name: "HoppairCoreTests", dependencies: ["HoppairCore"])
     ]
 )

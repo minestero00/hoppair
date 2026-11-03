@@ -5,6 +5,13 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import dev.macdroid.app.ui.HoppairTheme
 import androidx.core.net.toUri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +30,8 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     private val model: ShelfViewModel by viewModels()
     private var cameraUri: Uri? = null
+    private data class PairingInvite(val link: String, val host: String, val relayHost: String?)
+    private var pairingInvite by mutableStateOf<PairingInvite?>(null)
     private val pickFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> if (uris.isNotEmpty()) model.addFiles(uris) }
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) takePhoto() else android.widget.Toast.makeText(this, "Allow camera access to take a photo.", android.widget.Toast.LENGTH_LONG).show()
@@ -37,9 +46,19 @@ class MainActivity : ComponentActivity() {
         cameraUri = savedInstanceState?.getString("cameraUri")?.let(Uri::parse)
         enableEdgeToEdge()
         setContent {
-            MacDroidScreen(model, onFiles = { pickFiles.launch(arrayOf("*/*")) }, onCamera = ::takePhoto,
-                onCopy = { text -> getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("MacDroid", text)) }, onOpen = ::openEntry)
+            HoppairScreen(model, onFiles = { pickFiles.launch(arrayOf("*/*")) }, onCamera = ::takePhoto,
+                onCopy = { text -> getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Hoppair", text)) }, onOpen = ::openEntry)
+            pairingInvite?.let { invite ->
+                HoppairTheme {
+                    AlertDialog(onDismissRequest = ::dismissInvite,
+                        title = { Text("Connect to your Mac?") },
+                        text = { Text("Only continue if you scanned this code from your Mac. Your shelf will be shared with the Mac at ${invite.host}." + (invite.relayHost?.let { "\n\nRelay: $it" } ?: "")) },
+                        confirmButton = { TextButton(onClick = { dismissInvite(); model.pair(invite.link) }) { Text("Connect") } },
+                        dismissButton = { TextButton(onClick = ::dismissInvite) { Text("Cancel") } })
+                }
+            }
         }
+        receiveLink(intent)
         if (savedInstanceState == null) receiveShare(intent)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -47,8 +66,20 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); receiveShare(intent) }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); receiveLink(intent); receiveShare(intent) }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("cameraUri", cameraUri?.toString()); super.onSaveInstanceState(outState) }
+    private fun dismissInvite() { pairingInvite = null; intent.data = null }
+    private fun receiveLink(intent: Intent) {
+        if (intent.action != Intent.ACTION_VIEW) return
+        val link = intent.dataString ?: return
+        try {
+            val pair = Pairing.parse(link)
+            pairingInvite = PairingInvite(link, pair.host, pair.relay?.let { java.net.URI(it).host })
+        } catch (_: Exception) {
+            intent.data = null
+            android.widget.Toast.makeText(this, "Invalid pairing link. Scan the QR code shown on your Mac.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
     private fun receiveShare(intent: Intent) {
         if (intent.action == Intent.ACTION_SEND) {
             val uri = androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)

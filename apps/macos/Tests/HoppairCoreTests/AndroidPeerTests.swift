@@ -1,10 +1,10 @@
 import XCTest
-@testable import MacDroidCore
+@testable import HoppairCore
 
 final class AndroidPeerTests: XCTestCase {
     @MainActor
     func testAndroidPeer() async throws {
-        guard ProcessInfo.processInfo.environment["MACDROID_ANDROID_PEER"] == "1" else { throw XCTSkip("Run scripts/test-peer.sh with an Android emulator.") }
+        guard ProcessInfo.processInfo.environment["HOPPAIR_ANDROID_PEER"] == "1" else { throw XCTSkip("Run scripts/test-peer.sh with an Android emulator.") }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = try ShelfStore(root: root)
@@ -30,14 +30,14 @@ final class AndroidPeerTests: XCTestCase {
             } catch { return BridgeResponse(ok: false, error: error.localizedDescription) }
         }
         server.handler = handler
-        if ProcessInfo.processInfo.environment["MACDROID_RELAY_PEER"] == "1" {
+        if ProcessInfo.processInfo.environment["HOPPAIR_RELAY_PEER"] == "1" {
             let host = RelayHost(base: "ws://127.0.0.1:8787", key: Data(repeating: 7, count: 32), handler: handler)
             var announced = false
             host.onState = { connected in if connected && !announced { announced = true; ready.fulfill() } }
             relay = host; try host.start()
         } else { try server.start() }
         await fulfillment(of: [ready], timeout: 5)
-        let marker = ProcessInfo.processInfo.environment["MACDROID_PEER_READY"]!
+        let marker = ProcessInfo.processInfo.environment["HOPPAIR_PEER_READY"]!
         try Data("ready".utf8).write(to: URL(fileURLWithPath: marker))
         await fulfillment(of: [complete], timeout: 90)
         XCTAssertEqual(store.items.count, 3)

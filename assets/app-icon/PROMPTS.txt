@@ -1,3 +1,5 @@
+Provenance: generated for the former project name MacDroid. Hoppair reuses the same letter-free artwork; the original prompts below are preserved verbatim.
+
 Tool: built-in image_gen. The supplied macOS Dock image was a visual-quality reference only and is not distributed in this repository.
 
 macOS master:

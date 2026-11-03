@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hoppair-connect",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-03",
+  "vars": {
+    "SITE_URL": "https://minestero00.github.io/hoppair/",
+    "ANDROID_PACKAGE": "dev.macdroid.app",
+    "ANDROID_CERT_SHA256": "F6:6E:46:01:59:3C:A9:62:2B:2D:BC:D1:89:2B:98:FE:0C:44:B2:94:D5:16:1B:87:F6:9F:A2:04:D2:20:47:53"
+  },
+  "observability": {
+    "enabled": false
+  }
+}

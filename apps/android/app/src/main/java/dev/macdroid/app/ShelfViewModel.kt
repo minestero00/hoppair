@@ -47,9 +47,9 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
         state.update { it.copy(error = friendly(error), busy = false) }
     }
     private fun friendly(error: Exception): String = when (error) {
-        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (pairing?.relay != null) "Check the internet connection on both devices and open MacDroid. Pending items will retry automatically." else "Could not reach your Mac. Connect both devices to the same network and open MacDroid."
+        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (pairing?.relay != null) "Check the internet connection on both devices and open Hoppair. Pending items will retry automatically." else "Could not reach your Mac. Connect both devices to the same network and open Hoppair."
         is javax.crypto.AEADBadTagException, is java.io.EOFException -> "Could not verify this connection. Scan your Mac’s pairing QR code again."
-        is java.net.URISyntaxException -> "Use a MacDroid pairing QR code or pairing link."
+        is java.net.URISyntaxException -> "Use a Hoppair pairing QR code or pairing link."
         else -> error.localizedMessage ?: "Could not complete the action. Please try again shortly."
     }
     fun cameraDenied() { state.update { it.copy(error = "Camera access is needed to scan a QR code. Allow it in your phone settings or choose “Use a pairing link”.") } }

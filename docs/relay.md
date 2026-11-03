@@ -23,7 +23,7 @@ cd ../..
 Use the deployment script with the same registration file for updates. A plain deployment uses an empty registration map and rejects devices. To include the address in your own Mac build:
 
 ```bash
-MACDROID_RELAY_URL=wss://your-relay.workers.dev ./scripts/build-mac.sh
+HOPPAIR_RELAY_URL=wss://your-relay.workers.dev ./scripts/build-mac.sh
 ```
 
 ## Security and operation

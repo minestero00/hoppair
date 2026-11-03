@@ -14,7 +14,7 @@ class PeerIntegrationTest {
     @Test fun androidAndSwiftExchangeTextAndBinaryAndRetrySafely() {
         val encoded = Base64.encodeToString(ByteArray(32) { 7 }, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         val relayMode = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("relay") == "true"
-        val link = if (relayMode) "macdroid://127.0.0.1:1?key=$encoded&relay=ws%3A%2F%2F10.0.2.2%3A8787" else "macdroid://10.0.2.2:49272?key=$encoded"
+        val link = if (relayMode) "hoppair://127.0.0.1:1?key=$encoded&relay=ws%3A%2F%2F10.0.2.2%3A8787" else "hoppair://10.0.2.2:49272?key=$encoded"
         BridgeClient(Pairing.parse(link)).use { client ->
         val items = client.call("list").getJSONArray("items")
         val fileItem = items.getJSONObject(0)

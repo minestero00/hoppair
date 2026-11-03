@@ -54,7 +54,7 @@ private val AppTypography = Typography(
 )
 
 @Composable
-internal fun MacDroidTheme(content: @Composable () -> Unit) {
+internal fun HoppairTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
     val view = LocalView.current
     if (!view.isInEditMode) SideEffect {

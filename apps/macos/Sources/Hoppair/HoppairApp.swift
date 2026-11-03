@@ -3,14 +3,15 @@ import AppKit
 import Carbon
 
 @main
-struct MacDroidApp: App {
+struct HoppairApp: App {
     @StateObject private var model = AppModel()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     var body: some Scene {
-        WindowGroup("MacDroid", id: "shelf") {
+        WindowGroup("Hoppair", id: "shelf") {
             ShelfWindow(model: model, delegate: delegate)
         }
-        .defaultSize(width: 1000, height: 720)
+        .defaultSize(width: 1100, height: 740)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             CommandGroup(after: .newItem) {
                 Button("Open Commands") { model.openCommands(); delegate.reveal() }.keyboardShortcut("k")
@@ -18,7 +19,7 @@ struct MacDroidApp: App {
                 Button("Add from Clipboard") { model.paste() }.keyboardShortcut("v", modifiers: [.command, .shift])
             }
         }
-        MenuBarExtra("MacDroid", systemImage: "rectangle.on.rectangle") {
+        MenuBarExtra("Hoppair", systemImage: "rectangle.on.rectangle") {
             Button("Open Shared Shelf") { delegate.reveal() }
             Button("Open Commands  ⇧⌘Space") { model.openCommands(); delegate.reveal() }
             Divider()
@@ -38,10 +39,12 @@ private struct ShelfWindow: View {
     let delegate: AppDelegate
     var body: some View {
         ShelfView().environmentObject(model)
+            .toolbarBackground(.hidden, for: .windowToolbar)
             .environment(\.locale, model.isScreenshotMode ? Locale(identifier: "en_US") : Locale.autoupdatingCurrent)
             .onAppear {
             delegate.onOpenShelf = { openWindow(id: "shelf") }
             delegate.onHotKey = { model.openCommands(); delegate.reveal() }
+            delegate.configureWindowChrome()
             if model.isScreenshotMode { delegate.captureSampleView() }
         }
     }
@@ -55,8 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sampleCaptured = false
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.regular)
-        if Bundle.main.bundleIdentifier == "dev.macdroid.screenshots" {
-            let dark = ProcessInfo.processInfo.environment["MACDROID_SCREENSHOT_APPEARANCE"] == "dark"
+        if Bundle.main.bundleIdentifier == "dev.hoppair.screenshots" {
+            let dark = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_APPEARANCE"] == "dark"
             NSApplication.shared.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
             return
         }
@@ -69,23 +72,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
         let identifier = EventHotKeyID(signature: 0x4D445244, id: 1)
         let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | shiftKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
-        if status != noErr { NSLog("MacDroid global shortcut unavailable (status %d).", status) }
+        if status != noErr { NSLog("Hoppair global shortcut unavailable (status %d).", status) }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { reveal(); return true }
     func reveal() {
         NSApplication.shared.activate(ignoringOtherApps: true)
-        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue.contains("shelf") == true || $0.title == "MacDroid" }) {
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue.contains("shelf") == true || $0.title == "Hoppair" }) {
             window.makeKeyAndOrderFront(nil)
         } else { onOpenShelf?() }
     }
+    func configureWindowChrome() {
+        if let window = NSApplication.shared.windows.first(where: { $0.title == "Hoppair" }) {
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.titlebarSeparatorStyle = .none
+        }
+    }
     func captureSampleView() {
-        guard !sampleCaptured, Bundle.main.bundleIdentifier == "dev.macdroid.screenshots",
-              let path = ProcessInfo.processInfo.environment["MACDROID_SCREENSHOT_OUTPUT"] else { return }
+        guard !sampleCaptured, Bundle.main.bundleIdentifier == "dev.hoppair.screenshots",
+              let path = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_OUTPUT"] else { return }
         sampleCaptured = true
+        guard let window = NSApplication.shared.windows.first(where: { $0.title == "Hoppair" }) else { return }
+        let size = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SIZE", default: "1100x740"].split(separator: "x").compactMap { Double($0) }
+        if size.count == 2, (760...1600).contains(size[0]), (540...1100).contains(size[1]) {
+            window.setContentSize(NSSize(width: size[0], height: size[1]))
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            guard let window = NSApplication.shared.windows.first(where: { $0.title == "MacDroid" }),
-                  let view = window.contentView,
+            guard let view = window.contentView,
                   let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
             NSApplication.shared.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)

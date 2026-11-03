@@ -13,7 +13,7 @@ cd "$ROOT/apps/android"
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --console=plain > "$ROOT/artifacts/$PREFIX-android-build.log" 2>&1
 adb -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk > "$ROOT/artifacts/$PREFIX-install.log"
 adb -s "$SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >> "$ROOT/artifacts/$PREFIX-install.log"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/macdroid-peer.XXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/hoppair-peer.XXXXXX")"
 READY="$WORK_DIR/ready"
 HOST_PID=''
 cleanup() {
@@ -22,7 +22,7 @@ cleanup() {
     rmdir "$WORK_DIR"
 }
 trap cleanup EXIT
-MACDROID_ANDROID_PEER=1 MACDROID_RELAY_PEER="$RELAY_MODE" MACDROID_PEER_READY="$READY" swift test --package-path "$ROOT/apps/macos" --filter AndroidPeerTests > "$ROOT/artifacts/$PREFIX-swift.log" 2>&1 &
+HOPPAIR_ANDROID_PEER=1 HOPPAIR_RELAY_PEER="$RELAY_MODE" HOPPAIR_PEER_READY="$READY" swift test --package-path "$ROOT/apps/macos" --filter AndroidPeerTests > "$ROOT/artifacts/$PREFIX-swift.log" 2>&1 &
 HOST_PID=$!
 for ((attempt = 0; attempt < 60; attempt++)); do
     if [[ -f "$READY" ]]; then break; fi
@@ -32,7 +32,7 @@ done
 if [[ ! -f "$READY" ]]; then echo 'Swift peer did not become ready.' >&2; exit 1; fi
 adb -s "$SERIAL" shell am instrument -w -e relay "$([[ "$RELAY_MODE" == 1 ]] && echo true || echo false)" -e class dev.macdroid.app.PeerIntegrationTest,dev.macdroid.app.RepositoryTest dev.macdroid.app.test/androidx.test.runner.AndroidJUnitRunner > "$ROOT/artifacts/$PREFIX-android.log"
 cat "$ROOT/artifacts/$PREFIX-android.log"
-if ! rg -q 'OK \(2 tests\)' "$ROOT/artifacts/$PREFIX-android.log"; then exit 1; fi
+if ! rg -q 'OK \(3 tests\)' "$ROOT/artifacts/$PREFIX-android.log"; then exit 1; fi
 wait "$HOST_PID"
 HOST_PID=''
 cat "$ROOT/artifacts/$PREFIX-swift.log"

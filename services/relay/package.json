@@ -1,7 +1,7 @@
 {
-  "name": "macdroid-relay",
+  "name": "hoppair-relay",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --ip 127.0.0.1 --port 8787",

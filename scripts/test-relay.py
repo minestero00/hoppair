@@ -42,7 +42,7 @@ with (artifacts / "relay-worker.log").open("w") as log:
                 raise RuntimeError("Local relay exited; see artifacts/relay-worker.log")
             try:
                 with urllib.request.urlopen("http://127.0.0.1:8787/health", timeout=0.5) as response:
-                    if json.load(response).get("service") == "macdroid-relay":
+                    if json.load(response).get("service") == "hoppair-relay":
                         break
             except (OSError, ValueError):
                 time.sleep(1)
