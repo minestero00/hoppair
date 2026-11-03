@@ -16,7 +16,7 @@ struct ShelfBrowser: View {
                 ScrollViewReader { scroll in
                     List {
                         ForEach(items) { item in
-                            ShelfItemRow(item: item, url: model.previewURL(for: item), selected: item.id == selected?.id, copied: copiedID == item.id,
+                            ShelfItemRow(item: item, url: model.previewURL(for: item), selected: item.id == selected?.id, focused: listFocused && item.id == selected?.id, copied: copiedID == item.id,
                                 onSelect: { selectedID = item.id; listFocused = true; if !hasPreview { detail = item } },
                                 onAction: { perform(item) }, onPin: { model.pin(item) }, onDetails: { detail = item })
                                 .id(item.id)
@@ -26,12 +26,11 @@ struct ShelfBrowser: View {
                     }
                     .listStyle(.plain).scrollContentBackground(.hidden)
                     .focusable().focused($listFocused).focusEffectDisabled()
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(HoppairPalette.accent, lineWidth: listFocused ? 2 : 0).allowsHitTesting(false))
                     .onChange(of: selectedID) { _, id in if let id { scroll.scrollTo(id) } }
-                    .onKeyPress(.upArrow) { move(-1); return .handled }
-                    .onKeyPress(.downArrow) { move(1); return .handled }
-                    .onKeyPress(.return) { guard let selected else { return .ignored }; perform(selected); return .handled }
-                    .onKeyPress(.space) { guard let selected else { return .ignored }; detail = selected; return .handled }
+                    .onKeyPress(.upArrow) { guard listFocused else { return .ignored }; move(-1); return .handled }
+                    .onKeyPress(.downArrow) { guard listFocused else { return .ignored }; move(1); return .handled }
+                    .onKeyPress(.return) { guard listFocused, let selected else { return .ignored }; perform(selected); return .handled }
+                    .onKeyPress(.space) { guard listFocused, let selected else { return .ignored }; detail = selected; return .handled }
                 }
                 .padding(.vertical, 8).frame(minWidth: 290, maxWidth: .infinity)
                 if hasPreview, let selected {

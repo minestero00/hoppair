@@ -23,6 +23,7 @@ struct ShelfItemRow: View {
     let item: ShelfItem
     let url: URL?
     let selected: Bool
+    let focused: Bool
     let copied: Bool
     let onSelect: () -> Void
     let onAction: () -> Void
@@ -51,12 +52,17 @@ struct ShelfItemRow: View {
             Button(action: onAction) {
                 Image(systemName: copied ? "checkmark" : item.primarySymbol)
                     .font(.system(size: 13, weight: .medium)).frame(width: 16, height: 16)
+                    .foregroundStyle(copied ? HoppairPalette.accent : HoppairPalette.secondaryText)
             }.hoppairButton(.icon).padding(.trailing, 7)
-                .foregroundStyle(copied ? HoppairPalette.accent : .secondary)
                 .help(copied ? "Copied" : item.primaryTitle).accessibilityLabel(copied ? "Copied" : item.primaryTitle)
         }
-        .background(selected ? HoppairPalette.accent.opacity(0.12) : Color.primary.opacity(hovered ? 0.035 : 0), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(selected ? HoppairPalette.accent.opacity(0.20) : .clear))
+        .background(selected ? HoppairPalette.accent.opacity(focused ? 0.14 : 0.08) : Color.primary.opacity(hovered ? 0.035 : 0), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .leading) {
+            if focused {
+                Capsule().fill(HoppairPalette.accent).frame(width: 3, height: 24)
+                    .padding(.leading, 3).allowsHitTesting(false).accessibilityHidden(true)
+            }
+        }
         .onHover { hovered = $0 }
         .contextMenu {
             Button(item.primaryTitle, action: onAction)

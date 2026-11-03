@@ -45,24 +45,17 @@ struct HoppairButtonStyle: ButtonStyle {
                 .padding(.horizontal, kind == .row ? 0 : kind == .icon ? 7 : 11)
                 .padding(.vertical, kind == .row ? 0 : kind == .icon ? 7 : 8)
                 .background(background, in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(kind == .secondary ? (active ? HoppairPalette.accent.opacity(0.55) : HoppairPalette.border) : .clear))
                 .opacity(enabled ? configuration.isPressed ? 0.78 : 1 : 0.38)
                 .contentShape(RoundedRectangle(cornerRadius: 8))
+                .contentShape(.focusEffect, RoundedRectangle(cornerRadius: 8))
                 .onHover { hovered = $0 }
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: configuration.isPressed)
         }
     }
 }
-private struct HoppairButtonFocus: ViewModifier {
-    @FocusState private var focused: Bool
-    func body(content: Content) -> some View {
-        content.focused($focused).focusEffectDisabled()
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(HoppairPalette.accent, lineWidth: focused ? 2 : 0).padding(-3).allowsHitTesting(false))
-    }
-}
 extension View {
     func hoppairButton(_ kind: HoppairButtonStyle.Kind = .secondary, selected: Bool = false) -> some View {
-        buttonStyle(HoppairButtonStyle(kind: kind, selected: selected)).modifier(HoppairButtonFocus())
+        buttonStyle(HoppairButtonStyle(kind: kind, selected: selected))
     }
 }
