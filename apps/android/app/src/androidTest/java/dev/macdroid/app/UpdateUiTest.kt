@@ -1,6 +1,11 @@
 package dev.macdroid.app
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import java.io.File
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -8,6 +13,7 @@ import dev.macdroid.app.ui.HoppairTheme
 import dev.macdroid.app.ui.UpdateBanner
 import dev.macdroid.app.ui.UpdateSheet
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,4 +59,42 @@ class UpdateUiTest {
         compose.onNodeWithText("The update could not be verified.").assertIsDisplayed()
         compose.onNodeWithText("Retry download").assertIsDisplayed()
     }
+    @Test fun largeTextUpdateActionsRemainReachable() {
+        assumeTrue(InstrumentationRegistry.getArguments().getString("largeTextFixture") == "true")
+        var state by mutableStateOf(UpdateState(UpdateStage.AVAILABLE, release, sheet = true))
+        var dark by mutableStateOf(false)
+        var actions = 0
+        compose.setContent {
+            val config = LocalConfiguration.current
+            check(config.fontScale >= 1.9f && config.screenWidthDp <= 340) { "Run the narrow/large-text emulator fixture." }
+            HoppairTheme(dark = dark) {
+                UpdateSheet(state, onCheck = {}, onUpdate = { actions++ }, onCancel = { actions++ }, onDismiss = {})
+            }
+        }
+        for (night in listOf(false, true)) {
+            compose.runOnIdle { dark = night; state = state.copy(stage = UpdateStage.AVAILABLE, error = null) }
+            compose.onNodeWithText("Download update").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
+            capture("available-" + if (night) "dark" else "light")
+            compose.runOnIdle { state = state.copy(stage = UpdateStage.DOWNLOADING, progress = 42) }
+            compose.onNodeWithText("Cancel update").performScrollTo().assertIsDisplayed().performClick()
+            compose.runOnIdle { state = state.copy(stage = UpdateStage.ERROR, error = "The update could not be verified. Please try again later.") }
+            compose.onNodeWithText("Retry download").performScrollTo().assertIsDisplayed().performClick()
+            capture("retry-" + if (night) "dark" else "light")
+            compose.runOnIdle { state = state.copy(stage = UpdateStage.READY, error = null) }
+            compose.onNodeWithText("Install update").performScrollTo().assertIsDisplayed().performClick()
+            capture("install-" + if (night) "dark" else "light")
+        }
+        assertEquals(8, actions)
+    }
+    private fun capture(name: String) {
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val image = checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {
+            val directory = File(instrumentation.targetContext.getExternalFilesDir(null), "update-review")
+            check(directory.mkdirs() || directory.isDirectory)
+            File(directory, "$name.png").outputStream().use { check(image.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        } finally { image.recycle() }
+    }
+
 }
