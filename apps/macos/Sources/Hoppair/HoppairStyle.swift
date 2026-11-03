@@ -2,12 +2,21 @@ import SwiftUI
 
 // Shared native surfaces keep hover, press, focus and disabled states consistent.
 enum HoppairPalette {
-    static let accent = Color(nsColor: NSColor(name: nil) { appearance in
-        if appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua {
-            return NSColor(srgbRed: 0.50, green: 0.84, blue: 0.78, alpha: 1)
-        }
-        return NSColor(srgbRed: 0.04, green: 0.48, blue: 0.43, alpha: 1)
-    })
+    // Blue is reserved for links and system interaction; everyday surfaces stay neutral.
+    static let accent = Color(nsColor: .linkColor)
+    static let primaryFill = adaptive(light: shade(0.13), dark: shade(0.88))
+    static let primaryForeground = adaptive(light: .white, dark: shade(0.12))
+    static let iconSurface = Color.primary.opacity(0.045)
+    static let hoverFill = Color.primary.opacity(0.055)
+    static func selectionFill(focused: Bool) -> Color { Color.primary.opacity(focused ? 0.085 : 0.05) }
+    private static func shade(_ level: CGFloat) -> NSColor {
+        NSColor(srgbRed: level, green: level, blue: level, alpha: 1)
+    }
+    private static func adaptive(light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        })
+    }
     static let secondaryText = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             ? NSColor(srgbRed: 0.70, green: 0.73, blue: 0.77, alpha: 1)
@@ -33,15 +42,17 @@ struct HoppairButtonStyle: ButtonStyle {
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
         private var active: Bool { enabled && (hovered || configuration.isPressed) }
         private var background: Color {
-            if kind == .primary { return HoppairPalette.accent.opacity(active ? 0.86 : 1) }
-            if kind == .navigation || kind == .row {
-                return selected ? HoppairPalette.accent.opacity(active ? 0.20 : 0.12) : Color.primary.opacity(active ? 0.065 : 0)
+            if kind == .primary { return HoppairPalette.primaryFill.opacity(active ? 0.86 : 1) }
+            // The row container owns its hover fill so the action and content share one surface.
+            if kind == .row { return .clear }
+            if kind == .navigation {
+                return selected ? Color.primary.opacity(active ? 0.11 : 0.075) : Color.primary.opacity(active ? 0.055 : 0)
             }
-            return active ? HoppairPalette.accent.opacity(0.10) : (kind == .icon ? .clear : HoppairPalette.surface)
+            return active ? HoppairPalette.hoverFill : (kind == .icon ? .clear : HoppairPalette.surface)
         }
         var body: some View {
             configuration.label
-                .foregroundStyle(kind == .primary ? Color(nsColor: .windowBackgroundColor) : selected || (active && kind == .icon) ? HoppairPalette.accent : Color.primary)
+                .foregroundStyle(kind == .primary ? HoppairPalette.primaryForeground : Color.primary)
                 .padding(.horizontal, kind == .row ? 0 : kind == .icon ? 7 : 11)
                 .padding(.vertical, kind == .row ? 0 : kind == .icon ? 7 : 8)
                 .background(background, in: RoundedRectangle(cornerRadius: 8))

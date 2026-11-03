@@ -31,12 +31,12 @@ struct ItemThumbnail: View {
     @State private var bitmap: CGImage?
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: fitted ? 12 : 9).fill(HoppairPalette.accent.opacity(0.07))
+            RoundedRectangle(cornerRadius: fitted ? 12 : 9).fill(HoppairPalette.iconSurface)
             if let bitmap {
                 Image(decorative: bitmap, scale: 1).resizable().aspectRatio(contentMode: fitted ? .fit : .fill)
             } else {
                 Image(systemName: item.kind == "link" ? "link" : item.kind == "text" ? "text.alignleft" : item.mime?.hasPrefix("image/") == true ? "photo" : "doc.text")
-                    .font(.system(size: fitted ? 42 : 18, weight: .regular)).foregroundStyle(HoppairPalette.accent)
+                    .font(.system(size: fitted ? 42 : 18, weight: .regular)).foregroundStyle(item.kind == "link" ? HoppairPalette.accent : HoppairPalette.secondaryText)
             }
         }
         .frame(width: fitted ? nil : size, height: fitted ? nil : size)

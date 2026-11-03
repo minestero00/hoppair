@@ -40,7 +40,7 @@ struct ShelfItemRow: View {
                             Text(item.title.replacingOccurrences(of: "\n", with: " "))
                                 .font(.system(size: 13, weight: .semibold)).lineLimit(1)
                                 .truncationMode(item.kind == "file" ? .middle : .tail)
-                            if item.pinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(HoppairPalette.accent).accessibilityLabel("Pinned") }
+                            if item.pinned { Image(systemName: "pin.fill").font(.system(size: 9)).foregroundStyle(HoppairPalette.secondaryText).accessibilityLabel("Pinned") }
                         }
                         Text(item.rowSubtitle).font(.system(size: 12)).foregroundStyle(HoppairPalette.secondaryText).lineLimit(1)
                     }.frame(maxWidth: .infinity, alignment: .leading)
@@ -56,10 +56,10 @@ struct ShelfItemRow: View {
             }.hoppairButton(.icon).padding(.trailing, 7)
                 .help(copied ? "Copied" : item.primaryTitle).accessibilityLabel(copied ? "Copied" : item.primaryTitle)
         }
-        .background(selected ? HoppairPalette.accent.opacity(focused ? 0.14 : 0.08) : Color.primary.opacity(hovered ? 0.035 : 0), in: RoundedRectangle(cornerRadius: 10))
+        .background(selected ? HoppairPalette.selectionFill(focused: focused) : Color.primary.opacity(hovered ? 0.035 : 0), in: RoundedRectangle(cornerRadius: 10))
         .overlay(alignment: .leading) {
             if focused {
-                Capsule().fill(HoppairPalette.accent).frame(width: 3, height: 24)
+                Capsule().fill(Color.primary.opacity(0.65)).frame(width: 3, height: 24)
                     .padding(.leading, 3).allowsHitTesting(false).accessibilityHidden(true)
             }
         }
@@ -87,7 +87,7 @@ struct ShelfItemPreview: View {
                 Text("PREVIEW").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(HoppairPalette.secondaryText)
                 Spacer()
                 Button(action: onPin) { Image(systemName: item.pinned ? "pin.fill" : "pin").frame(width: 15, height: 15) }
-                    .hoppairButton(.icon, selected: item.pinned).help(item.pinned ? "Unpin item" : "Pin item")
+                    .hoppairButton(.icon).help(item.pinned ? "Unpin item" : "Pin item")
                     .accessibilityLabel(item.pinned ? "Unpin item" : "Pin item")
             }
             if item.kind == "file" {

@@ -30,7 +30,7 @@ struct ShelfView: View {
                 VStack(spacing: 6) {
                     ForEach(sections, id: \.0) { name, symbol in
                         Button { section = name } label: {
-                            HStack { Image(systemName: symbol).frame(width: 22); Text(name); Spacer(); if name == "All Items" { Text("\(model.items.count)").foregroundStyle(HoppairPalette.secondaryText) } }
+                            HStack { Image(systemName: symbol).frame(width: 22); Text(name).fontWeight(section == name ? .semibold : .regular); Spacer(); if name == "All Items" { Text("\(model.items.count)").foregroundStyle(HoppairPalette.secondaryText) } }
                                 .padding(10).frame(maxWidth: .infinity, alignment: .leading)
 
                         }.hoppairButton(.navigation, selected: section == name)
@@ -43,7 +43,7 @@ struct ShelfView: View {
                     HStack { Image(systemName: "desktopcomputer"); Text("This Mac"); Spacer(); Text(model.isScreenshotMode ? "Preview" : model.port > 0 || model.relayConnected ? "Ready" : "Preparing").font(.caption).foregroundStyle(HoppairPalette.secondaryText) }
                     TimelineView(.periodic(from: .now, by: 3)) { context in
                         let online = model.lastSeen.map { context.date.timeIntervalSince($0) < 12 } ?? false
-                        HStack { Image(systemName: "smartphone"); Text("Android"); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? accent : .secondary) }
+                        HStack { Image(systemName: "smartphone"); Text("Android"); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? Color.primary : Color.secondary) }
                     }
                     Button("Connect Phone", systemImage: "link") { model.showPairing = true }.frame(maxWidth: .infinity)
                 }.padding(14).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
@@ -69,11 +69,11 @@ struct ShelfView: View {
                     .padding(11).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10)).padding(.horizontal, 24)
                 if model.cameraRequest != nil {
                     HStack { Label("Open Hoppair on your phone to confirm the photo request", systemImage: "camera"); Spacer(); Button("Cancel Request") { model.cameraRequest = nil } }
-                        .font(.callout).padding(12).background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 24).padding(.top, 12)
+                        .font(.callout).padding(12).background(HoppairPalette.iconSurface, in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 24).padding(.top, 12)
                 }
                 if filtered.isEmpty {
                     VStack(spacing: 14) {
-                        Image(systemName: search.isEmpty ? "tray" : "magnifyingglass").font(.system(size: 44, weight: .light)).foregroundStyle(accent)
+                        Image(systemName: search.isEmpty ? "tray" : "magnifyingglass").font(.system(size: 44, weight: .light)).foregroundStyle(HoppairPalette.secondaryText)
                         Text(emptyTitle).font(.title2.bold())
                         Text(emptyMessage)
                             .multilineTextAlignment(.center).foregroundStyle(HoppairPalette.secondaryText)
