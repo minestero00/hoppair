@@ -104,6 +104,103 @@ class SyncRecoveryTest {
         assertEquals(500, repo.entries.size)
     }
 
+    @Test fun damagedReceivedFileIsRepairedWithoutLosingItsSavedEntry() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        repo.file(file.getString("id")).writeBytes(byteArrayOf(1))
+        val note = item("text")
+        var fetched = 0
+        val result = repo.merge(JSONArray().put(file).put(note)) { fetched++; byteArrayOf(1, 2, 3) }
+        assertEquals(1, fetched)
+        val revision = repo.entries.single { it.id == file.getString("id") }.fileRevision
+        assertTrue(revision != 0L)
+        repo.merge(JSONArray().put(file)) { error("Valid repair must not be fetched again") }
+        assertEquals(revision, repo.entries.single { it.id == file.getString("id") }.fileRevision)
+        assertEquals(0, result.unavailableFiles)
+        assertEquals(2, ShelfRepository(context).entries.size)
+        assertArrayEquals(byteArrayOf(1, 2, 3), repo.file(file.getString("id")).readBytes())
+    }
+
+    @Test fun unavailableRepairDoesNotHideIncomingNotesOrDeleteExistingBytes() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        repo.file(file.getString("id")).writeBytes(byteArrayOf(1))
+        val result = repo.merge(JSONArray().put(file).put(item("text"))) { throw PeerRejected("File not found.") }
+        assertEquals(1, result.unavailableFiles)
+        assertEquals(2, ShelfRepository(context).entries.size)
+        assertArrayEquals(byteArrayOf(1), repo.file(file.getString("id")).readBytes())
+    }
+
+    @Test fun repairedIndexedFileSurvivesLaterBadPayloadWithoutCommittingNewMetadata() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        repo.file(file.getString("id")).writeBytes(byteArrayOf(1))
+        val newFile = item("file").put("size", 3)
+        val badFile = item("file").put("size", 4)
+        val snapshot = JSONArray().put(JSONObject(file.toString()).put("pinned", true)).put(newFile).put(badFile)
+        assertThrows(IllegalArgumentException::class.java) { repo.merge(snapshot) { byteArrayOf(1, 2, 3) } }
+        assertFalse(repo.entries.single().pinned)
+        assertTrue(repo.entries.single().fileRevision != 0L)
+        assertFalse(ShelfRepository(context).entries.single().pinned)
+        assertArrayEquals(byteArrayOf(1, 2, 3), repo.file(file.getString("id")).readBytes())
+        assertFalse(repo.file(newFile.getString("id")).exists())
+        assertFalse(repo.file(badFile.getString("id")).exists())
+    }
+
+    @Test fun conflictingRemoteSizeCannotOverwriteAnExistingFile() = repository { _, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        var fetched = false
+        assertThrows(IllegalArgumentException::class.java) {
+            repo.merge(JSONArray().put(JSONObject(file.toString()).put("size", 1))) { fetched = true; byteArrayOf(9) }
+        }
+        assertFalse(fetched)
+        assertEquals(3, repo.entries.single().size)
+        assertArrayEquals(byteArrayOf(1, 2, 3), repo.file(file.getString("id")).readBytes())
+    }
+
+    @Test fun nonRegularLocalPathDoesNotBlockUnrelatedNotes() = repository { _, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        val path = repo.file(file.getString("id"))
+        assertTrue(path.delete()); assertTrue(path.mkdir())
+        val result = repo.merge(JSONArray().put(file).put(item("text"))) { error("Do not replace a directory") }
+        assertEquals(1, result.unavailableFiles)
+        assertEquals(2, repo.entries.size)
+        assertTrue(path.isDirectory)
+    }
+
+    @Test fun failedRepairWritePreservesOldBytesAndStillCommitsNotes() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        val stored = repo.file(file.getString("id"))
+        stored.writeBytes(byteArrayOf(1))
+        val blockedWrite = File(stored.path + ".new").apply { mkdir() }
+        File(blockedWrite, "occupied").writeText("fixture")
+        val result = repo.merge(JSONArray().put(file).put(item("text"))) { byteArrayOf(1, 2, 3) }
+        assertEquals(1, result.unavailableFiles)
+        assertEquals(2, ShelfRepository(context).entries.size)
+        assertArrayEquals(byteArrayOf(1), stored.readBytes())
+    }
+
+    @Test fun failedIndexCommitKeepsRepairButRollsBackNewFileAndMetadata() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        val stored = repo.file(file.getString("id"))
+        stored.writeBytes(byteArrayOf(1))
+        val newFile = item("file").put("size", 3)
+        val blockedIndex = File(context.filesDir, "shelf.json.new").apply { mkdir() }
+        File(blockedIndex, "occupied").writeText("fixture")
+        assertThrows(java.io.IOException::class.java) {
+            repo.merge(JSONArray().put(JSONObject(file.toString()).put("pinned", true)).put(newFile)) { byteArrayOf(1, 2, 3) }
+        }
+        assertFalse(repo.entries.single().pinned)
+        assertArrayEquals(byteArrayOf(1, 2, 3), stored.readBytes())
+        assertFalse(repo.file(newFile.getString("id")).exists())
+        blockedIndex.deleteRecursively()
+        assertFalse(ShelfRepository(context).entries.single().pinned)
+    }
+
     private fun item(kind: String) = JSONObject().put("id", UUID.randomUUID().toString()).put("kind", kind)
         .put("title", "Public fixture").put("text", "A new note from Mac").put("filename", "fixture.bin")
         .put("mime", "application/octet-stream").put("size", 0).put("createdAt", 1.0).put("source", "Mac").put("pinned", false)

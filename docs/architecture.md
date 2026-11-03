@@ -19,7 +19,7 @@ The optional WSS relay carries one sealed payload per binary message, without th
 | `cameraAck` | Acknowledge a photo request |
 | `syncAck` | Confirm a round trip and exchange device names |
 
-The Mac writes file data and an atomic index before acknowledging `put`. Stable item UUIDs make retries idempotent. Android marks an outbox item delivered only after success. Received files and links are never opened automatically.
+The Mac writes file data and an atomic index before acknowledging `put`. Stable item UUIDs make retries idempotent. Android marks an outbox item delivered only after success. Received files and links are never opened automatically. Missing or truncated received files are fetched again without blocking unrelated notes. Repairs retain the saved item’s type and declared size; queued local files are never replaced by downloads. A repaired indexed file remains usable even if a later item aborts the snapshot, while new unindexed downloads are cleaned up.
 
 Limits: 8 MiB per file, 64 KiB per text item, 12 MiB per encrypted frame, 500 shelf items. A full shelf rejects new items without removing old ones.
 

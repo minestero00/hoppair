@@ -52,7 +52,8 @@ internal fun validatedShelfItem(input: JSONObject): JSONObject {
     return result
 }
 
-internal data class ShelfEntry(val json: JSONObject, val pending: Boolean = false) {
+/** fileRevision only invalidates live previews after repair; it is not a protocol or index field. */
+internal data class ShelfEntry(val json: JSONObject, val pending: Boolean = false, val fileRevision: Long = 0) {
     val id: String get() = json.getString("id")
     val title: String get() = json.getString("title")
     val kind: String get() = json.getString("kind")
@@ -237,9 +238,14 @@ internal class ShelfRepository(private val context: Context) {
                 if (existing < 0 && next.size >= MAX_SHELF_ITEMS) { capacityLimited++; continue }
                 // A remote UUID collision must not discard a locally queued item before its put is acknowledged.
                 if (existing >= 0 && next[existing].pending) continue
+                if (existing >= 0) {
+                    require(next[existing].kind == entry.kind) { "An existing item changed its type." }
+                    if (entry.kind == "file") require(next[existing].size == entry.size) { "An existing file changed its declared size." }
+                }
                 if (entry.kind == "file") {
                     val stored = file(entry.id)
-                    if (!stored.exists()) {
+                    if (stored.exists() && !stored.isFile) { unavailableFiles++; continue }
+                    if (!stored.isFile || stored.length() != entry.size.toLong()) {
                         // A missing file must not hide unrelated notes or block the outbox.
                         // Stop requesting more files after a transport failure in this pass.
                         if (interruption != null) { unavailableFiles++; continue }
@@ -247,11 +253,19 @@ internal class ShelfRepository(private val context: Context) {
                         catch (_: PeerRejected) { unavailableFiles++; continue }
                         catch (error: java.io.IOException) { unavailableFiles++; interruption = error; continue }
                         require(bytes.size == entry.size) { "The downloaded file does not match its declared size." }
-                        storeFile(entry.id, bytes)
-                        downloaded.add(stored)
-                    } else require(stored.length() == entry.size.toLong()) { "The stored file does not match its declared size." }
+                        try { storeFile(entry.id, bytes) }
+                        catch (_: java.io.IOException) { unavailableFiles++; continue }
+                        if (existing < 0) downloaded.add(stored)
+                        else {
+                            // Repair the already indexed payload independently of this snapshot.
+                            // Later failures keep the old metadata and the repaired file together.
+                            val revision = System.nanoTime()
+                            entries = entries.map { if (it.id == entry.id) it.copy(fileRevision = revision) else it }
+                            next[existing] = next[existing].copy(fileRevision = revision)
+                        }
+                    }
                 }
-                if (existing >= 0) next[existing] = entry else next.add(entry)
+                if (existing >= 0) next[existing] = entry.copy(fileRevision = next[existing].fileRevision) else next.add(entry)
             }
             commit(next.sortedByDescending { it.json.getDouble("createdAt") })
             return ShelfMergeResult(unavailableFiles, interruption, capacityLimited)

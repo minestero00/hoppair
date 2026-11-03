@@ -33,7 +33,7 @@ internal object ShelfImages {
         val file = File(root, id)
         if (!file.isFile || file.length() != entry.size.toLong() || file.length() !in 1..MAX_FILE.toLong()) return@withContext null
         val limit = edge.coerceIn(1, 960)
-        val key = "${file.absolutePath}:${file.lastModified()}:${file.length()}:$limit"
+        val key = "${file.absolutePath}:${file.lastModified()}:${file.length()}:${entry.fileRevision}:$limit"
         decoding.withLock {
             cache.get(key)?.let { return@withLock it }
             try {
@@ -54,9 +54,9 @@ internal object ShelfImages {
 @Composable
 internal fun ShelfImage(entry: ShelfEntry, detail: Boolean = false, fallback: @Composable () -> Unit) {
     val root = File(LocalContext.current.filesDir, "shelf")
-    // Shelf payloads are immutable per UUID and published only after their file is saved.
+    // Payloads are immutable per UUID; local repair advances a transient revision.
     // A reused composition must never flash the previous item's photo.
-    key(root.path, entry.id, entry.size, entry.kind, entry.json.optString("mime"), detail) {
+    key(root.path, entry.id, entry.size, entry.kind, entry.json.optString("mime"), entry.fileRevision, detail) {
         val bitmap by produceState<Bitmap?>(null) {
             value = ShelfImages.load(root, entry, if (detail) 960 else 160)
         }

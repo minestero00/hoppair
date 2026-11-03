@@ -47,6 +47,29 @@ class ShelfImageTest {
         }
     }
 
+    @Test fun repairRevisionInvalidatesPreviewWithUnchangedTimestampAndLength() = runBlocking {
+        fixture { root ->
+            val entry = photo(root, 32, 16)
+            val file = File(root, entry.id)
+            fun replace(color: Int) {
+                val bitmap = Bitmap.createBitmap(32, 16, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(color)
+                val output = java.io.ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+                bitmap.recycle()
+                // Valid PNG plus padding gives both fixtures identical encoded length.
+                check(output.size() < 4096)
+                file.writeBytes(output.toByteArray().copyOf(4096))
+                check(file.setLastModified(1_000_000))
+            }
+            val padded = ShelfEntry(JSONObject(entry.json.toString()).put("size", 4096))
+            replace(Color.RED)
+            assertEquals(Color.RED, checkNotNull(ShelfImages.load(root, padded, 160)).getPixel(0, 0))
+            replace(Color.BLUE)
+            assertEquals(Color.BLUE, checkNotNull(ShelfImages.load(root, padded.copy(fileRevision = 1), 160)).getPixel(0, 0))
+        }
+    }
+
     private suspend fun fixture(block: suspend (File) -> Unit) {
         val root = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "preview-test-${UUID.randomUUID()}").apply { mkdirs() }
         try { block(root) } finally { root.deleteRecursively() }
