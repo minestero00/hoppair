@@ -37,8 +37,20 @@ private struct ShelfWindow: View {
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var model: AppModel
     let delegate: AppDelegate
+    private var sampleScene: String { ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SCENE"] ?? "shelf" }
+    private var sampleHeight: CGFloat? {
+        ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SIZE"]?.split(separator: "x").last.flatMap { Double($0) }.map { CGFloat($0) }
+    }
     var body: some View {
-        ShelfView().environmentObject(model)
+        Group {
+            if model.isScreenshotMode && sampleScene.hasPrefix("pairing") {
+                PairingView(initiallyExpanded: sampleScene == "pairing-expanded", maximumHeight: sampleHeight)
+            } else {
+                ShelfView()
+            }
+        }.environmentObject(model)
+            .environment(\.hoppairOpaquePreview, model.isScreenshotMode && ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_OPAQUE"] == "1")
+            .background { if model.isScreenshotMode { HoppairCanvas().ignoresSafeArea() } }
             .toolbarBackground(.hidden, for: .windowToolbar)
             .environment(\.locale, model.isScreenshotMode ? Locale(identifier: "en_US") : Locale.autoupdatingCurrent)
             .onAppear {
@@ -95,7 +107,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sampleCaptured = true
         guard let window = NSApplication.shared.windows.first(where: { $0.title == "Hoppair" }) else { return }
         let size = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SIZE", default: "1100x740"].split(separator: "x").compactMap { Double($0) }
-        if size.count == 2, (760...1600).contains(size[0]), (540...1100).contains(size[1]) {
+        let pairing = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SCENE"]?.hasPrefix("pairing") == true
+        if size.count == 2, pairing ? (size[0] == 470 && (360...650).contains(size[1])) : ((760...1600).contains(size[0]) && (540...1100).contains(size[1])) {
             window.setContentSize(NSSize(width: size[0], height: size[1]))
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -108,8 +121,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let output = URL(fileURLWithPath: path)
                 try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try bitmap.representation(using: .png, properties: [:])?.write(to: output)
+                // Native materials leave transparent pixels in an offscreen view capture.
+                // Render the window's backing color as part of the exported sample.
+                guard let image = bitmap.cgImage,
+                    let context = CGContext(data: nil, width: bitmap.pixelsWide, height: bitmap.pixelsHigh,
+                        bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return }
+                var backing = CGColor(gray: 0.95, alpha: 1)
+                window.effectiveAppearance.performAsCurrentDrawingAppearance { backing = NSColor.windowBackgroundColor.cgColor }
+                let bounds = CGRect(x: 0, y: 0, width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
+                context.setFillColor(backing)
+                context.fill(bounds)
+                context.setBlendMode(.normal)
+                context.draw(image, in: bounds)
+                guard let rendered = context.makeImage() else { return }
+                try NSBitmapImageRep(cgImage: rendered).representation(using: .png, properties: [:])?.write(to: output)
                 print("Saved sample app view.")
+                if ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_EXIT"] == "1" { NSApplication.shared.terminate(nil) }
             } catch { print("Could not save sample app view: " + error.localizedDescription) }
         }
     }

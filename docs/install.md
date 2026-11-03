@@ -32,7 +32,7 @@ Add a file, link, or note on either device. On Android, other apps can send item
 
 Configure the optional [relay](relay.md) once, then scan the updated QR. The same device identity survives changes to your Mac's network and IP. The download does not include a hosted relay.
 
-Keep the Mac awake and Hoppair running. Keep Android's app open to sync; pending items remain stored when disconnected.
+Pairing is saved securely. Reopen both apps to reconnect automatically; no new QR scan is needed. Keep the Mac awake and both apps open to sync. Pending items remain stored while disconnected.
 
 Limits: 8 MiB per file, 64 KiB per text item, 500 shelf items. This release targets one Mac and one Android phone. Full shelves reject new items; there is no item deletion or in-app key rotation yet.
 

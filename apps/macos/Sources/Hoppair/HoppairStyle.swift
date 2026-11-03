@@ -6,6 +6,7 @@ enum HoppairPalette {
     static let accent = Color(nsColor: .linkColor)
     static let primaryFill = adaptive(light: shade(0.13), dark: shade(0.88))
     static let primaryForeground = adaptive(light: .white, dark: shade(0.12))
+    static let primaryText = adaptive(light: shade(0.12), dark: shade(0.94))
     static let iconSurface = Color.primary.opacity(0.045)
     static let hoverFill = Color.primary.opacity(0.055)
     static func selectionFill(focused: Bool) -> Color { Color.primary.opacity(focused ? 0.085 : 0.05) }
@@ -19,8 +20,8 @@ enum HoppairPalette {
     }
     static let secondaryText = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            ? NSColor(srgbRed: 0.70, green: 0.73, blue: 0.77, alpha: 1)
-            : NSColor(srgbRed: 0.38, green: 0.41, blue: 0.46, alpha: 1)
+            ? NSColor(srgbRed: 0.75, green: 0.75, blue: 0.75, alpha: 1)
+            : NSColor(srgbRed: 0.40, green: 0.40, blue: 0.40, alpha: 1)
     })
     static let surface = Color(nsColor: .controlBackgroundColor)
     static let border = Color(nsColor: .separatorColor).opacity(0.45)
@@ -48,11 +49,12 @@ struct HoppairButtonStyle: ButtonStyle {
             if kind == .navigation {
                 return selected ? Color.primary.opacity(active ? 0.11 : 0.075) : Color.primary.opacity(active ? 0.055 : 0)
             }
-            return active ? HoppairPalette.hoverFill : (kind == .icon ? .clear : HoppairPalette.surface)
+            return active ? HoppairPalette.hoverFill : (kind == .icon ? .clear : Color.primary.opacity(0.035))
         }
         var body: some View {
             configuration.label
-                .foregroundStyle(kind == .primary ? HoppairPalette.primaryForeground : Color.primary)
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(kind == .primary ? HoppairPalette.primaryForeground : HoppairPalette.primaryText)
                 .padding(.horizontal, kind == .row ? 0 : kind == .icon ? 7 : 11)
                 .padding(.vertical, kind == .row ? 0 : kind == .icon ? 7 : 8)
                 .background(background, in: RoundedRectangle(cornerRadius: 8))
@@ -68,5 +70,44 @@ struct HoppairButtonStyle: ButtonStyle {
 extension View {
     func hoppairButton(_ kind: HoppairButtonStyle.Kind = .secondary, selected: Bool = false) -> some View {
         buttonStyle(HoppairButtonStyle(kind: kind, selected: selected))
+    }
+    func hoppairGlass(cornerRadius: CGFloat = 16) -> some View {
+        modifier(HoppairGlassSurface(cornerRadius: cornerRadius))
+    }
+}
+
+private struct HoppairGlassSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.hoppairOpaquePreview) private var opaquePreview
+    @Environment(\.colorSchemeContrast) private var contrast
+    let cornerRadius: CGFloat
+
+    @ViewBuilder func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        if reduceTransparency || opaquePreview || contrast == .increased {
+            content.background(HoppairPalette.surface, in: shape)
+        } else if #available(macOS 26.0, *) {
+            content.glassEffect(.regular.tint(HoppairPalette.surface.opacity(0.55)), in: shape)
+        } else {
+            content.background(.regularMaterial, in: shape)
+        }
+    }
+}
+
+private struct HoppairOpaquePreviewKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var hoppairOpaquePreview: Bool {
+        get { self[HoppairOpaquePreviewKey.self] }
+        set { self[HoppairOpaquePreviewKey.self] = newValue }
+    }
+}
+
+struct HoppairCanvas: View {
+    var body: some View {
+        LinearGradient(colors: [Color(nsColor: .windowBackgroundColor), HoppairPalette.surface],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }

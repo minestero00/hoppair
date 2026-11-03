@@ -31,10 +31,12 @@ import dev.macdroid.app.R
 import dev.macdroid.app.ShelfEntry
 import dev.macdroid.app.ShelfState
 import java.util.Locale
+import dev.chrisbanes.haze.HazeState
 
 @Composable
-internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, onSearch: () -> Unit, onConnection: () -> Unit) {
-    Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).padding(horizontal = 20.dp, vertical = 8.dp),
+internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, hazeState: HazeState, onSearch: () -> Unit, onConnection: () -> Unit) {
+    Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+        .padding(horizontal = 16.dp, vertical = 8.dp).hoppairGlass(hazeState).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Image(painterResource(R.drawable.hoppair_brand), null, Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)))
         Spacer(Modifier.width(10.dp))
@@ -54,8 +56,8 @@ internal fun ConnectionCard(state: ShelfState, onClick: () -> Unit) {
                 Icon(Icons.Outlined.LaptopMac, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(if (state.online) "Mac connected" else "Mac is offline", style = MaterialTheme.typography.titleMedium)
-                Text(if (state.online) state.status else if (pending > 0) "$pending waiting to send" else "Your shelf is saved on this phone",
+                Text(if (state.online) "Mac connected" else "Waiting for Mac", style = MaterialTheme.typography.titleMedium)
+                Text(if (state.online) state.status else if (pending > 0) "$pending waiting · reconnecting automatically" else "Reconnecting automatically",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Icon(if (state.online) Icons.Outlined.CheckCircle else Icons.Outlined.CloudOff, null,
@@ -134,12 +136,12 @@ internal fun ShelfItem(entry: ShelfEntry, onDetails: () -> Unit, onCopy: (String
 }
 
 @Composable
-internal fun ShelfComposer(draft: String, onDraft: (String) -> Unit, busy: Boolean, onAttach: () -> Unit, onSend: () -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.background) {
+internal fun ShelfComposer(draft: String, onDraft: (String) -> Unit, busy: Boolean, hazeState: HazeState, onAttach: () -> Unit, onSend: () -> Unit) {
+    Surface(color = androidx.compose.ui.graphics.Color.Transparent) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                 .navigationBarsPadding().imePadding().padding(horizontal = 16.dp).padding(top = 10.dp, bottom = 12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(Modifier.hoppairGlass(hazeState).padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FilledTonalIconButton(onClick = onAttach, enabled = !busy, modifier = Modifier.size(48.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.onSurface)) {

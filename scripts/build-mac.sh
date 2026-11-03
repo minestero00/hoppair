@@ -27,7 +27,7 @@ cp "$BIN/Hoppair" "$APP/Contents/MacOS/Hoppair"
 python3 "$ROOT/scripts/build-icons.py"
 cp "$ROOT/dist/CompiledIcons/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$ROOT/dist/CompiledIcons/Assets.car" "$APP/Contents/Resources/Assets.car"
-sips -z 256 256 "$ROOT/assets/app-icon/AppIcon.icon/Assets/Artwork.png" --out "$APP/Contents/Resources/BrandIcon.png" >/dev/null
+sips -z 256 256 "$ROOT/assets/app-icon/brand.png" --out "$APP/Contents/Resources/BrandIcon.png" >/dev/null
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -38,8 +38,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleName</key><string>Hoppair</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.4</string>
-<key>CFBundleVersion</key><string>9</string>
+<key>CFBundleShortVersionString</key><string>0.1.5</string>
+<key>CFBundleVersion</key><string>12</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 <key>NSHighResolutionCapable</key><true/>

@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "dev.macdroid.app"
     compileSdk = 36
-    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 5; versionName = "0.1.4"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 6; versionName = "0.1.5"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     val signingPath = providers.environmentVariable("HOPPAIR_ANDROID_SIGNING_FILE").orNull
         ?: providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
     if (signingPath != null) {
@@ -26,6 +26,7 @@ kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarg
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("dev.chrisbanes.haze:haze:1.6.10")
     val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)

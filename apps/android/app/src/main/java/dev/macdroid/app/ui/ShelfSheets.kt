@@ -29,15 +29,24 @@ internal fun ConnectionSheet(state: ShelfState, manual: Boolean, link: String, o
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             SheetHeading(if (state.paired) "Your Mac" else "Make the connection", onDismiss)
             if (state.paired) {
-                Text(if (state.online) "Connected" else "Mac is offline", style = MaterialTheme.typography.titleMedium,
+                Text(if (state.online) "Connected" else "Waiting for Mac", style = MaterialTheme.typography.titleMedium,
                     color = if (state.online) ShelfColors.success() else MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(state.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Your Mac is saved. Hoppair reconnects automatically when you open the app.",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
-            Text("Open Connect Phone in Hoppair on your Mac, then scan its QR code.", style = MaterialTheme.typography.bodyLarge)
-            Button(onClick = onScan, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-                shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(16.dp)) {
-                Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
+            if (state.paired) {
+                TextButton(onClick = onScan, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) {
+                    Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Update connection with QR")
+                }
+            } else {
+                Text("Open Connect Phone in Hoppair on your Mac, then scan its QR code.", style = MaterialTheme.typography.bodyLarge)
+                Button(onClick = onScan, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
+                    shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(16.dp)) {
+                    Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
+                }
             }
             TextButton(onClick = onManual, modifier = Modifier.heightIn(min = 48.dp),
                 colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) { Text(if (manual) "Hide pairing link" else "Use a pairing link") }

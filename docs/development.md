@@ -56,12 +56,14 @@ Real-phone QR/camera, LTE, sleep/wake, permissions, accessibility, and battery b
 
 Run `./scripts/test-android-ui.sh emulator-5580` on a disposable emulator for the Android UI gate (Node.js 22+ required). It uses an isolated loopback shelf, checks search/details/attachments, and captures onboarding, light/dark themes, large text, landscape, and tablet layouts under `artifacts/android-ui/`.
 
-After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately identified screenshot app and renders its sample shelf to `artifacts/macos-ui/shelf.png`. It never loads the personal shelf, pairing key, or network services. Quit the screenshot app before capturing again. Set `HOPPAIR_SCREENSHOT_APPEARANCE=dark` for a dark capture or `HOPPAIR_SCREENSHOT_SIZE=800x640` for a compact window.
+Run `python3 scripts/test-android-reconnect.py --serial emulator-5580` on a disposable emulator to verify saved pairing and automatic sync across two fresh app processes. It uses the same isolated fixture and does not scan a new QR code.
+
+After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately identified screenshot app and renders its sample shelf to `artifacts/macos-ui/shelf.png`. It never loads the personal shelf, pairing key, or network services. Quit the screenshot app before capturing again. Set `HOPPAIR_SCREENSHOT_APPEARANCE=dark` for a dark capture or `HOPPAIR_SCREENSHOT_SIZE=800x640` for a compact window. Set `HOPPAIR_SCREENSHOT_SCENE=pairing-expanded` and `HOPPAIR_SCREENSHOT_SIZE=470x520` to inspect expanded connection options; `HOPPAIR_SCREENSHOT_EXIT=1` closes the sample app after capture. Native glass may not appear fully in offscreen captures; `HOPPAIR_SCREENSHOT_OPAQUE=1` renders the supported Reduce Transparency appearance for stable layout previews. Inspect optical glass effects in the live app.
 
 ## Package a release
 
 ```bash
-./scripts/package-release.sh 0.1.4
+./scripts/package-release.sh 0.1.5
 ```
 
 Existing MacDroid signing configurations are reused automatically; do not generate a replacement key for an existing installation. `MACDROID_*` signing/build environment variables remain accepted as fallbacks.
@@ -84,7 +86,7 @@ For command-line packaging, use an existing `notarytool` Keychain profile:
 ```bash
 HOPPAIR_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 HOPPAIR_NOTARY_PROFILE=hoppair-notary \
-./scripts/package-release.sh 0.1.4
+./scripts/package-release.sh 0.1.5
 ```
 
 Create the profile yourself with `xcrun notarytool store-credentials hoppair-notary`; credentials stay outside Git. The packaging script enables hardened runtime, waits for notarization, staples the ticket, and then archives the app.

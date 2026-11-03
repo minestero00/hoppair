@@ -1,7 +1,11 @@
 # App icon
 
-- `AppIcon.icon/` is the editable Apple Icon Composer source.
-- `android.png` is the adaptive launcher's safe-area artwork.
-- `PROMPTS.txt` records the image-generation inputs.
+A white laptop-and-phone mark on charcoal, shared by both apps and the website.
 
-The icon depicts a silver laptop and green phone on blue. Artwork was generated with the built-in `image_gen` tool; platform packaging uses Apple's asset compiler and Android adaptive masks. Original artwork is covered by the project's MIT license.
+- `AppIcon.icon/Assets/Symbol.svg` is the editable vector source.
+- `AppIcon.icon/` supplies the native macOS mask and background.
+- `brand.png` is the rounded in-app mark; `android.png` shows the adaptive safe-area composition.
+
+To regenerate the PNGs and Android vectors, run `npm ci --prefix tests/site` and `npx --prefix tests/site playwright install chromium`, then `node scripts/export-icons.cjs`. `python3 scripts/build-icons.py` compiles the Apple icon with Xcode.
+
+The original vector artwork is licensed under MIT.

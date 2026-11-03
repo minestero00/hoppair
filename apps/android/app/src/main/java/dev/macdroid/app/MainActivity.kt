@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
     private fun dismissInvite() { pairingInvite = null; intent.data = null }
     private fun receiveLink(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
+        pairingInvite = null
         val link = intent.dataString ?: return
         try {
             val pair = Pairing.parse(link)

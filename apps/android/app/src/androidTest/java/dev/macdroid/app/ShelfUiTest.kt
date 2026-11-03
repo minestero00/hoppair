@@ -41,6 +41,7 @@ class ShelfUiTest {
         var backedUp = false
         val oldNight = context.getSystemService(UiModeManager::class.java).nightMode
         val oldIme = Settings.Secure.getString(context.contentResolver, "show_ime_with_hard_keyboard")?.toIntOrNull() ?: 0
+        val oldContrast = shell("settings get secure contrast_level").takeUnless { it == "null" || it.isBlank() }
         val screenshots = File(checkNotNull(context.getExternalFilesDir(null)), "ui-review").apply { mkdirs() }
         var scenario: ActivityScenario<MainActivity>? = null
         try {
@@ -70,6 +71,15 @@ class ShelfUiTest {
             assertEquals(originalPairing, PairingVault(context).load())
             scenario.onActivity { it.startActivity(incoming) }
             waitText("Connect to your Mac?")
+            val invalid = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://other.example/connect/#pair=invalid"))
+                .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            scenario.onActivity { it.startActivity(invalid) }
+            compose.waitUntil(timeoutMillis = 15000) {
+                runCatching { compose.onAllNodesWithText("Connect to your Mac?").fetchSemanticsNodes().isEmpty() }.getOrDefault(false)
+            }
+            assertEquals(originalPairing, PairingVault(context).load())
+            scenario.onActivity { it.startActivity(incoming) }
+            waitText("Connect to your Mac?")
             compose.onNodeWithText("Connect", substring = false).performClick()
             compose.waitUntil(timeoutMillis = 15000) { PairingVault(context).load() == incoming.dataString }
             compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()
@@ -78,6 +88,11 @@ class ShelfUiTest {
             // ActivityScenario recreates by matching the original launch intent.
             scenario.onActivity { it.intent = checkNotNull(launchIntent) }
             screenshot(screenshots, "shelf-light")
+            tapDescription("Mac connection")
+            waitText("Your Mac is saved")
+            waitText("Update connection with QR")
+            screenshot(screenshots, "saved-connection")
+            tapDescription("Close")
             tapText("A few things for tomorrow")
             waitText("Keep it simple", contains = true)
             screenshot(screenshots, "note-details")
@@ -106,6 +121,12 @@ class ShelfUiTest {
             Thread.sleep(800)
             waitText("Your shelf")
             screenshot(screenshots, "shelf-dark")
+            if (Build.VERSION.SDK_INT >= 34) {
+                shell("settings put secure contrast_level 1.0")
+                compose.waitUntil(timeoutMillis = 5000) { context.getSystemService(UiModeManager::class.java).contrast > 0f }
+                screenshot(screenshots, "shelf-high-contrast")
+                shell(if (oldContrast == null) "settings delete secure contrast_level" else "settings put secure contrast_level $oldContrast")
+            }
             shell("settings put system font_scale 2.0")
             shell("wm density 460")
             shell("settings put global animator_duration_scale 0")
@@ -148,6 +169,7 @@ class ShelfUiTest {
             shell("settings put system font_scale " + oldScale)
             shell("settings put global animator_duration_scale " + oldAnimation)
             shell("settings put secure show_ime_with_hard_keyboard " + oldIme)
+            shell(if (oldContrast == null) "settings delete secure contrast_level" else "settings put secure contrast_level $oldContrast")
             shell("cmd uimode night " + when (oldNight) { UiModeManager.MODE_NIGHT_YES -> "yes"; UiModeManager.MODE_NIGHT_NO -> "no"; else -> "auto" })
             Thread.sleep(300)
             if (backedUp) files.forEach { File(context.filesDir, it).deleteRecursively() }
@@ -159,9 +181,9 @@ class ShelfUiTest {
         }
     }
 
-    private fun shell(command: String) { automation.executeShellCommand(command).use { descriptor ->
-        java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }
-    } }
+    private fun shell(command: String): String = automation.executeShellCommand(command).use { descriptor ->
+        java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes().toString(Charsets.UTF_8).trim() }
+    }
     private fun waitDisplay(scenario: ActivityScenario<MainActivity>, fontScale: Float, density: Int? = null, orientation: Int? = null) {
         compose.waitUntil(timeoutMillis = 20000) {
             var matches = false
@@ -214,10 +236,19 @@ class ShelfUiTest {
     private fun screenshot(directory: File, name: String) {
         instrumentation.waitForIdleSync()
         Thread.sleep(250)
-        val roots = compose.onAllNodes(isRoot())
-        val image = if (roots.fetchSemanticsNodes().size == 1) roots.onFirst().captureToImage().asAndroidBitmap()
-            else checkNotNull(automation.takeScreenshot())
-        File(directory, name + ".png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        image.recycle()
+        var image: Bitmap? = null
+        // A dismissed dialog may briefly remove the root before the activity resumes.
+        compose.waitUntil(timeoutMillis = 15000) {
+            try {
+                val roots = compose.onAllNodes(isRoot())
+                val count = roots.fetchSemanticsNodes().size
+                if (count > 0) image = if (count == 1) roots.onFirst().captureToImage().asAndroidBitmap()
+                    else checkNotNull(automation.takeScreenshot())
+                image != null
+            } catch (_: IllegalStateException) { false }
+        }
+        val bitmap = checkNotNull(image)
+        File(directory, name + ".png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
     }
 }

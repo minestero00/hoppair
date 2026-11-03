@@ -36,7 +36,8 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
                     try {
                         repository = ShelfRepository(application)
                         pairing = vault.load()?.let(Pairing::parse)
-                        state.update { it.copy(entries = repository!!.entries, paired = pairing != null, host = pairing?.host ?: "") }
+                        state.update { it.copy(entries = repository!!.entries, paired = pairing != null, host = pairing?.host ?: "",
+                            status = if (pairing != null) "Reconnecting to your Mac…" else it.status) }
                     } catch (error: Exception) { fail(error) }
                 }
             }
@@ -47,7 +48,7 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
         state.update { it.copy(error = friendly(error), busy = false) }
     }
     private fun friendly(error: Exception): String = when (error) {
-        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (pairing?.relay != null) "Check the internet connection on both devices and open Hoppair. Pending items will retry automatically." else "Could not reach your Mac. Connect both devices to the same network and open Hoppair."
+        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (pairing?.relay != null) "Check the internet connection on both devices and open Hoppair. Reconnecting automatically." else "Open Hoppair on your Mac and use the same network. Reconnecting automatically."
         is javax.crypto.AEADBadTagException, is java.io.EOFException -> "Could not verify this connection. Scan your Mac’s pairing QR code again."
         is java.net.URISyntaxException -> "Use a Hoppair pairing QR code or pairing link."
         else -> error.localizedMessage ?: "Could not complete the action. Please try again shortly."

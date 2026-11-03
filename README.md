@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/app-icon/AppIcon.icon/Assets/Artwork.png" width="96" alt="Hoppair icon"></p>
+<p align="center"><img src="assets/app-icon/brand.png" width="96" alt="Hoppair icon"></p>
 
 # Hoppair
 

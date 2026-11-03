@@ -31,13 +31,24 @@ final class AppModel: ObservableObject {
             preparing = false
             relayAddress = ""
             message = "Sample content · no devices connected"
+            let iconSize = Bundle.main.url(forResource: "BrandIcon", withExtension: "png")
+                .flatMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize } ?? 0
             items = [
                 ShelfItem(kind: "text", title: "A few things for tomorrow",
                           text: "Pick up the design where you left off. Keep it simple, keep it useful.", source: "Android", pinned: true),
-                ShelfItem(kind: "file", title: "Hoppair icon.png", filename: "Hoppair icon.png", mime: "image/png", size: 74599, source: "Android"),
+                ShelfItem(kind: "file", title: "Hoppair icon.png", filename: "Hoppair icon.png", mime: "image/png", size: iconSize, source: "Android"),
                 ShelfItem(kind: "link", title: "A little inspiration", text: "https://developer.android.com/design", source: "Mac"),
                 ShelfItem(kind: "text", title: "Coffee, then a little planning.", text: "Coffee, then a little planning.", source: "Android")
             ]
+            if ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_SCENE"]?.hasPrefix("pairing") == true {
+                // Public fixtures only; screenshot builds never start services or load credentials.
+                key = Data(repeating: 7, count: 32)
+                port = 49271
+                addresses = ["192.0.2.12"]
+                selectedAddress = "192.0.2.12"
+                relayAddress = "wss://relay.example.com"
+                relayConnected = true
+            }
             return
         }
         selectedAddress = addresses.first ?? ""
@@ -86,6 +97,7 @@ final class AppModel: ObservableObject {
         } else { showCommands = true }
     }
     func configureRelay(_ input: String? = nil) {
+        guard !isScreenshotMode else { return }
         let address = (input ?? relayAddress).trimmingCharacters(in: .whitespacesAndNewlines)
         if address.isEmpty { relayHost?.stop(); relayHost = nil; relayAddress = ""; UserDefaults.standard.removeObject(forKey: "relayAddress"); return }
         do {
@@ -98,6 +110,7 @@ final class AppModel: ObservableObject {
         } catch { self.error = error.localizedDescription }
     }
     func refreshNetwork() {
+        guard !isScreenshotMode else { return }
         addresses = Self.localAddresses()
         if !addresses.contains(selectedAddress) { selectedAddress = addresses.first ?? "" }
     }

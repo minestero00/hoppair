@@ -46,7 +46,7 @@ struct ShelfView: View {
                         HStack { Image(systemName: "smartphone"); Text("Android"); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? Color.primary : Color.secondary) }
                     }
                     Button("Connect Phone", systemImage: "link") { model.showPairing = true }.frame(maxWidth: .infinity)
-                }.padding(14).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+                }.padding(14).hoppairGlass()
                 Text(model.isScreenshotMode ? "Sample content" : model.relayConnected ? "Connected across networks" : model.relayAddress.isEmpty ? "Direct connection on your local network" : "Connecting to your relay")
                     .font(.caption).foregroundStyle(HoppairPalette.secondaryText)
             }.padding(18).navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
@@ -64,9 +64,9 @@ struct ShelfView: View {
                     action("Add File", symbol: "arrow.up.doc", action: model.chooseFiles)
                     action("Add Clipboard", symbol: "doc.on.clipboard", action: model.paste)
                     action("Take Photo", symbol: "camera", action: model.requestCamera)
-                }.padding(.horizontal, 24).padding(.bottom, 14)
+                }.padding(6).hoppairGlass().padding(.horizontal, 24).padding(.bottom, 14)
                 HStack { Image(systemName: "magnifyingglass").foregroundStyle(HoppairPalette.secondaryText); TextField("Search the shelf", text: $search).textFieldStyle(.plain); if !search.isEmpty { Button("Clear") { search = "" }.font(.caption) } }
-                    .padding(11).background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10)).padding(.horizontal, 24)
+                    .padding(11).background(HoppairPalette.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 10)).padding(.horizontal, 24)
                 if model.cameraRequest != nil {
                     HStack { Label("Open Hoppair on your phone to confirm the photo request", systemImage: "camera"); Spacer(); Button("Cancel Request") { model.cameraRequest = nil } }
                         .font(.callout).padding(12).background(HoppairPalette.iconSurface, in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 24).padding(.top, 12)
@@ -92,9 +92,9 @@ struct ShelfView: View {
                             .hoppairButton(.primary).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                     HStack { Text(model.message).lineLimit(2); Spacer(); Text("Up to 8 MiB per file") }.font(.caption).foregroundStyle(HoppairPalette.secondaryText)
-                }.padding(.horizontal, 24).padding(.vertical, 18)
+                }.padding(.horizontal, 24).padding(.vertical, 18).background(.regularMaterial)
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(HoppairCanvas())
             .overlay { if targeting { RoundedRectangle(cornerRadius: 16).stroke(accent, style: StrokeStyle(lineWidth: 3, dash: [8])).padding(10).allowsHitTesting(false) } }
             .onDrop(of: [.fileURL], isTargeted: $targeting) { providers in
                 for provider in providers {
@@ -108,7 +108,7 @@ struct ShelfView: View {
         }
         .buttonStyle(HoppairButtonStyle())
         .tint(accent).frame(minWidth: 800, minHeight: 600)
-        .sheet(isPresented: $model.showPairing) { PairingView().environmentObject(model) }
+        .sheet(isPresented: $model.showPairing) { PairingView().environmentObject(model).presentationBackground(.clear) }
         .sheet(isPresented: $model.showCommands) { commands }
         .alert("Could Not Complete the Action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }

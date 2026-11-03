@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const release = require('../../site/release.json');
 const secret = Buffer.alloc(32, 7).toString('base64url');
 const native = `hoppair://10.0.2.2:49273?key=${secret}`;
 const payload = Buffer.from(native).toString('base64url');
@@ -14,7 +15,7 @@ test('pairing stays in the fragment and the app link has an install fallback', a
   expect(intent).toContain(';scheme=hoppair;package=dev.macdroid.app;');
   const fallback = decodeURIComponent(intent.split('S.browser_fallback_url=')[1].split(';end')[0]);
   expect(fallback).toContain('?install=1#pair=' + payload);
-  await expect(page.locator('[data-install]')).toHaveAttribute('href', /Hoppair-0\.1\.4-android\.apk$/);
+  await expect(page.locator('[data-install]')).toHaveAttribute('href', release.android.url);
   expect(requests.every(url => !url.includes(secret) && !url.includes(payload))).toBe(true);
 });
 test('install fallback preserves the return-to-app step on a small phone', async ({ page }) => {

@@ -1,14 +1,14 @@
 {
   "fill": {
-    "automatic-gradient": "extended-srgb:0.01200,0.22000,0.92000,1.00000"
+    "solid": "extended-srgb:0.09020,0.09020,0.09020,1.00000"
   },
   "groups": [
     {
       "layers": [
         {
           "glass": false,
-          "image-name": "Artwork.png",
-          "name": "MacBook and Android"
+          "image-name": "Symbol.svg",
+          "name": "Laptop and phone"
         }
       ],
       "shadow": {

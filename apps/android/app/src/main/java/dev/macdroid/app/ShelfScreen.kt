@@ -33,6 +33,8 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import dev.macdroid.app.ui.*
 import kotlinx.coroutines.launch
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 
 @Composable
 internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera: () -> Unit,
@@ -52,6 +54,7 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
     val keyboard = LocalSoftwareKeyboardController.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val hazeState = rememberHazeState()
     val copy: (String) -> Unit = { text -> onCopy(text); scope.launch { snackbar.showSnackbar("Copied") } }
     val closeSearch: () -> Unit = { searching = false; search = ""; focusManager.clearFocus(); keyboard?.hide() }
     val showComposer = state.paired || state.entries.isNotEmpty()
@@ -80,7 +83,7 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 Column {
-                    ShelfToolbar(searching, showComposer,
+                    ShelfToolbar(searching, showComposer, hazeState,
                         onSearch = { if (searching) closeSearch() else searching = true }, onConnection = { pairing = true })
                     if (searching && showComposer) {
                         LaunchedEffect(Unit) { searchFocus.requestFocus() }
@@ -100,18 +103,19 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
             },
             bottomBar = {
                 if (showComposer) {
-                    ShelfComposer(draft, { draft = it }, state.busy, onAttach = { attachments = true },
-                        onSend = { model.addText(draft) { draft = "" } })
+                    ShelfComposer(draft, { draft = it }, state.busy, hazeState, onAttach = { attachments = true },
+                        onSend = { val submitted = draft; model.addText(submitted) { if (draft == submitted) draft = "" } })
                 }
             },
             contentWindowInsets = WindowInsets.safeDrawing.only(
                 if (showComposer) WindowInsetsSides.Horizontal else WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         ) { padding ->
-            BoxWithConstraints(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+            BoxWithConstraints(Modifier.fillMaxSize().consumeWindowInsets(padding).hazeSource(hazeState).hoppairCanvas()) {
                 val gutter = if (maxWidth >= 600.dp) 32.dp else 24.dp
-                val compact = maxHeight < 400.dp
+                val compact = maxHeight - padding.calculateTopPadding() - padding.calculateBottomPadding() < 400.dp
                 val contentWidth = Modifier.widthIn(max = 720.dp).fillMaxWidth().align(Alignment.TopCenter)
-                LazyColumn(contentWidth, contentPadding = PaddingValues(start = gutter, end = gutter, top = 12.dp, bottom = 24.dp),
+                LazyColumn(contentWidth, contentPadding = PaddingValues(start = gutter, end = gutter,
+                    top = padding.calculateTopPadding() + 12.dp, bottom = padding.calculateBottomPadding() + 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (!state.paired && !searching) {
                         item { WelcomePanel(state.busy, onScan = scan, onManual = { manual = true; pairing = true }) }
