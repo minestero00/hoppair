@@ -53,7 +53,7 @@ struct PairingView: View {
                             .font(.caption).foregroundStyle(HoppairPalette.secondaryText).multilineTextAlignment(.center)
                         TimelineView(.periodic(from: .now, by: 2)) { context in
                             if let lastSeen = model.lastSeen, context.date.timeIntervalSince(lastSeen) < 12 {
-                                Label("Connected! Your shared shelf is ready.", systemImage: "checkmark.circle.fill")
+                                Label("Connected to \(model.peerName)", systemImage: "checkmark.circle.fill")
                                     .font(.callout).foregroundStyle(.tint)
                             }
                         }
@@ -103,8 +103,8 @@ struct PairingView: View {
         } else {
             VStack(spacing: 14) {
                 Image(systemName: "wifi.exclamationmark").font(.largeTitle)
-                Text("Check your Mac’s network connection.").multilineTextAlignment(.center)
-                Button("Check Again") { model.refreshNetwork() }
+                Text(model.port == 0 ? "The connection could not start. Restart Hoppair and check any startup error." : "Check your Mac’s network connection.").multilineTextAlignment(.center)
+                if model.port > 0 { Button("Check Again") { model.refreshNetwork() } }
             }.frame(width: 256, height: 256)
         }
     }
@@ -112,6 +112,14 @@ struct PairingView: View {
     private var connectionOptions: some View {
         DisclosureGroup("More connection options", isExpanded: $advanced) {
             VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("This Mac’s name").font(.caption.weight(.semibold))
+                    TextField(model.defaultDeviceName, text: $model.deviceName)
+                        .textFieldStyle(.roundedBorder).onSubmit { model.saveDeviceName() }
+                        .onChange(of: model.deviceName) { _, _ in model.saveDeviceName() }
+                    Text("Shown on your phone. Leave blank to use the system name.")
+                        .font(.caption).foregroundStyle(HoppairPalette.secondaryText)
+                }
                 Text("Send the pairing link to your phone, or choose another address if your Mac uses multiple networks.")
                     .foregroundStyle(HoppairPalette.secondaryText).fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 8) {
@@ -142,7 +150,7 @@ struct PairingView: View {
                             .hoppairButton(.secondary).disabled(model.preparing)
                     }
                     if !model.relayAddress.isEmpty && !model.relayConnected {
-                        Text("Connecting to the relay. Check that this device is registered.")
+                        Text(model.relayIssue ?? "Connecting to the relay. Check that this device is registered.")
                             .font(.caption).foregroundStyle(HoppairPalette.secondaryText).fixedSize(horizontal: false, vertical: true)
                     }
                     Button("Copy Relay Registration") { model.copy(model.relayRegistration) }
@@ -161,7 +169,7 @@ struct PairingView: View {
                         .hoppairButton(.secondary).disabled(model.preparing || model.pairingLink.isEmpty)
                 }
             }.padding(.top, 16)
-        }.font(.callout)
+        }.disclosureGroupStyle(HoppairDisclosureStyle()).font(.callout)
     }
 
     private func applyRelay() {

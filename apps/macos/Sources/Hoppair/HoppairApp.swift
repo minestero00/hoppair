@@ -4,6 +4,11 @@ import Carbon
 
 @main
 struct HoppairApp: App {
+    private static let menuBarIcon: NSImage = {
+        let image = NSImage(named: "MenuBarTemplate") ?? NSImage(systemSymbolName: "laptopcomputer.and.iphone", accessibilityDescription: "Hoppair")!
+        image.isTemplate = true
+        return image
+    }()
     @StateObject private var model = AppModel()
     @StateObject private var updater = AppUpdater()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -21,7 +26,7 @@ struct HoppairApp: App {
                 Button("Add from Clipboard") { model.paste() }.keyboardShortcut("v", modifiers: [.command, .shift])
             }
         }
-        MenuBarExtra("Hoppair", systemImage: "rectangle.on.rectangle") {
+        MenuBarExtra {
             Button("Open Shared Shelf") { delegate.reveal() }
             Button("Open Commands  ⇧⌘Space") { model.openCommands(); delegate.reveal() }
             Divider()
@@ -29,9 +34,11 @@ struct HoppairApp: App {
             Button("Add File…") { model.chooseFiles() }
             Button("Take a Photo") { model.requestCamera(); delegate.reveal() }
             Divider()
-            Button("Connect Phone") { model.showPairing = true; delegate.reveal() }
+            Button("Connect Phone") { model.openPairing(); delegate.reveal() }
             CheckForUpdatesButton(updater: updater)
             Button("Quit") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
+        } label: {
+            Image(nsImage: Self.menuBarIcon).accessibilityLabel("Hoppair")
         }
     }
 }
@@ -54,6 +61,7 @@ private struct ShelfWindow: View {
         }.environmentObject(model)
             .environment(\.hoppairOpaquePreview, model.isScreenshotMode && ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_OPAQUE"] == "1")
             .background { if model.isScreenshotMode { HoppairCanvas().ignoresSafeArea() } }
+            .background(WindowChromeAttachment())
             .toolbarBackground(.hidden, for: .windowToolbar)
             .environment(\.locale, model.isScreenshotMode ? Locale(identifier: "en_US") : Locale.autoupdatingCurrent)
             .onAppear {
@@ -61,7 +69,6 @@ private struct ShelfWindow: View {
             delegate.onHotKey = { model.openCommands(); delegate.reveal() }
             delegate.hasPendingImports = { model.pendingImports > 0 }
             delegate.finishPendingImports = { await model.finishPendingImports() }
-            delegate.configureWindowChrome()
             if model.isScreenshotMode { delegate.captureSampleView() }
         }
     }
@@ -109,13 +116,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.makeKeyAndOrderFront(nil)
         } else { onOpenShelf?() }
     }
-    func configureWindowChrome() {
-        if let window = NSApplication.shared.windows.first(where: { $0.title == "Hoppair" }) {
-            window.titleVisibility = .hidden
-            window.titlebarAppearsTransparent = true
-            window.titlebarSeparatorStyle = .none
-        }
-    }
     func captureSampleView() {
         guard !sampleCaptured, Bundle.main.bundleIdentifier == "dev.hoppair.screenshots",
               let path = ProcessInfo.processInfo.environment["HOPPAIR_SCREENSHOT_OUTPUT"] else { return }
@@ -159,5 +159,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     deinit {
         if let hotKey { UnregisterEventHotKey(hotKey) }
         if let eventHandler { RemoveEventHandler(eventHandler) }
+    }
+}
+
+/// Configure the owning window after attachment, rather than guessing from NSApp.windows
+/// during SwiftUI onAppear (which may run before the window exists).
+private struct WindowChromeAttachment: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Attachment() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    private final class Attachment: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            guard let window else { return }
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.titlebarSeparatorStyle = .none
+            // Respect the native content boundary, including split-view/material layers.
+            window.contentView?.wantsLayer = true
+            window.contentView?.layer?.masksToBounds = true
+        }
     }
 }

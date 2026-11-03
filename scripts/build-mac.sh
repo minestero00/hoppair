@@ -25,6 +25,7 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 APP="$WORK_DIR/Hoppair.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/Hoppair" "$APP/Contents/MacOS/Hoppair"
+cp "$ROOT/assets/app-icon/"MenuBarTemplate*.png "$APP/Contents/Resources/"
 python3 "$ROOT/scripts/build-icons.py"
 cp "$ROOT/dist/CompiledIcons/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 cp "$ROOT/dist/CompiledIcons/Assets.car" "$APP/Contents/Resources/Assets.car"
@@ -39,8 +40,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleName</key><string>Hoppair</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.7</string>
-<key>CFBundleVersion</key><string>17</string>
+<key>CFBundleShortVersionString</key><string>0.1.8</string>
+<key>CFBundleVersion</key><string>18</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 <key>NSHighResolutionCapable</key><true/>

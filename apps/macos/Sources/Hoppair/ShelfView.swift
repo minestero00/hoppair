@@ -40,14 +40,14 @@ struct ShelfView: View {
                 Spacer()
                 VStack(alignment: .leading, spacing: 12) {
                     Label("My Devices", systemImage: "laptopcomputer").font(.caption.bold()).foregroundStyle(HoppairPalette.secondaryText)
-                    HStack { Image(systemName: "desktopcomputer"); Text("This Mac"); Spacer(); Text(model.isScreenshotMode ? "Preview" : model.port > 0 || model.relayConnected ? "Ready" : "Preparing").font(.caption).foregroundStyle(HoppairPalette.secondaryText) }
+                    HStack { Image(systemName: "desktopcomputer"); Text(model.localDeviceName).lineLimit(1).help(model.localDeviceName); Spacer(); Text(model.isScreenshotMode ? "Preview" : model.port > 0 || model.relayConnected ? "Ready" : "Preparing").font(.caption).foregroundStyle(HoppairPalette.secondaryText) }
                     TimelineView(.periodic(from: .now, by: 3)) { context in
                         let online = model.lastSeen.map { context.date.timeIntervalSince($0) < 12 } ?? false
-                        HStack { Image(systemName: "smartphone"); Text("Android"); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? Color.primary : Color.secondary) }
+                        HStack { Image(systemName: "smartphone"); Text(model.peerName).lineLimit(1).help(model.peerName); Spacer(); Text(online ? "Connected" : "Waiting").font(.caption).foregroundStyle(online ? Color.primary : Color.secondary) }
                     }
-                    Button("Connect Phone", systemImage: "link") { model.showPairing = true }.frame(maxWidth: .infinity)
+                    Button { model.showPairing = true } label: { Label("Connect Phone", systemImage: "link").frame(maxWidth: .infinity) }
                 }.padding(14).hoppairGlass()
-                Text(model.isScreenshotMode ? "Sample content" : model.relayConnected ? "Connected across networks" : model.relayAddress.isEmpty ? "Direct connection on your local network" : "Connecting to your relay")
+                Text(model.isScreenshotMode ? "Sample content" : model.relayConnected ? "Relay ready for remote sync" : model.relayAddress.isEmpty ? "Direct connection on your local network" : (model.relayIssue ?? "Connecting to your relay"))
                     .font(.caption).foregroundStyle(HoppairPalette.secondaryText)
             }.padding(18).navigationSplitViewColumnWidth(min: 220, ideal: 240, max: 280)
         } detail: {
@@ -89,7 +89,8 @@ struct ShelfView: View {
                         TextField("Add text or a link to the shelf", text: $draft, axis: .vertical)
                             .textFieldStyle(.plain).lineLimit(1...4).focused($composerFocused).padding(8)
                         Button("Add", systemImage: "arrow.up") { sendDraft() }
-                            .hoppairButton(.primary).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .hoppairButton(.primary).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.showPairing || model.showCommands)
+                            .keyboardShortcut(.return, modifiers: [.command]).help("Add to shelf (⌘Return)")
                     }
                     HStack {
                         if model.pendingImports > 0 { ProgressView().controlSize(.small).accessibilityLabel("Adding files") }
@@ -100,6 +101,7 @@ struct ShelfView: View {
                 }.padding(.horizontal, 24).padding(.vertical, 18).background(.regularMaterial)
             }
             .background(HoppairCanvas())
+            .clipped()
             .overlay { if targeting { RoundedRectangle(cornerRadius: 16).stroke(accent, style: StrokeStyle(lineWidth: 3, dash: [8])).padding(10).allowsHitTesting(false) } }
             .onDrop(of: [.fileURL], isTargeted: $targeting) { providers in
                 for provider in providers {

@@ -21,6 +21,15 @@ async function main() {
       await page.setContent(`<style>html,body{margin:0;width:100%;height:100%;background:transparent}svg{display:block;width:100%;height:100%}</style>${svg(scale, rounded)}`);
       await page.screenshot({ path: path.join(root, file), omitBackground: true });
     }
+    // Crop the canonical mark to its actual bounds, then rasterize at menu-bar scale.
+    await page.setContent(`<style>html,body{margin:0;background:transparent}svg{display:block}</style>${source}`);
+    const bounds = await page.locator('svg > g').evaluate(g => { const b = g.getBBox(); const m = g.transform.baseVal.consolidate().matrix; return { x: b.x + m.e, y: b.y + m.f, width: b.width, height: b.height }; });
+    const menuWidth = Math.ceil(18 * bounds.width / bounds.height);
+    for (const scale of [1, 2]) {
+      await page.setViewportSize({ width: menuWidth * scale, height: 18 * scale });
+      await page.setContent(`<style>html,body{margin:0;background:transparent}svg{display:block;width:100%;height:100%}</style><svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x - 12} ${bounds.y - 12} ${bounds.width + 24} ${bounds.height + 24}" fill="black">${mark}</svg>`);
+      await page.screenshot({ path: path.join(root, `assets/app-icon/MenuBarTemplate${scale === 2 ? '@2x' : ''}.png`), omitBackground: true });
+    }
     await render('assets/app-icon/brand.png', 1024, 1, true);
     await render('assets/app-icon/android.png', 1024, 0.78, false);
     await render('site/assets/icon.png', 256, 1, true);

@@ -17,6 +17,15 @@ class BoundedRelayDraftTest {
     private fun fragment(first: Boolean, size: Int): FramedataImpl1 = (if (first) BinaryFrame() else ContinuousFrame()).apply {
         setPayload(ByteBuffer.allocate(size)); setFin(false)
     }
+    @Test fun rejectedHandshakeRetainsOnlyStatusAcrossCopiedDrafts() {
+        for (status in listOf(401, 429, 503)) {
+            var observed = 0
+            val draft = BoundedRelayDraft { observed = it }.copyInstance().apply { setParseMode(Role.CLIENT) }
+            val response = "HTTP/1.1 $status Rejected\r\nContent-Length: 0\r\n\r\n".toByteArray(Charsets.US_ASCII)
+            assertThrows(InvalidHandshakeException::class.java) { draft.translateHandshake(ByteBuffer.wrap(response)) }
+            assertEquals(status, observed)
+        }
+    }
     @Test fun advertisedOversizeFrameIsRejectedWithoutReceivingItsPayload() {
         assertEquals(MAX_FRAME, BoundedRelayDraft.MAX_FRAME)
         val header = ByteBuffer.allocate(10).put(0x82.toByte()).put(127.toByte()).putLong(MAX_FRAME + 1L).apply { flip() }

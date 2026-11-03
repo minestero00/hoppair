@@ -22,22 +22,25 @@ import dev.macdroid.app.ShelfState
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ConnectionSheet(state: ShelfState, manual: Boolean, link: String, onLink: (String) -> Unit,
-    onManual: () -> Unit, onScan: () -> Unit, onPair: () -> Unit, onDismiss: () -> Unit) {
+    onManual: () -> Unit, onScan: () -> Unit, onPair: () -> Unit, onDismiss: () -> Unit, onRename: (String) -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             SheetHeading(if (state.paired) "Your Mac" else "Make the connection", onDismiss)
             if (state.paired) {
-                Text(if (state.online) "Connected" else "Waiting for Mac", style = MaterialTheme.typography.titleMedium,
+                Text(if (state.online) "Connected to ${state.peerName}" else "Waiting for ${state.peerName}", style = MaterialTheme.typography.titleMedium,
                     color = if (state.online) ShelfColors.success() else MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(state.status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Your Mac is saved. Hoppair reconnects automatically when you open the app.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
+            OutlinedTextField(value = state.deviceName, onValueChange = onRename, label = { Text("This phone’s name") },
+                placeholder = { Text(state.defaultDeviceName) }, supportingText = { Text("Shown on your Mac. Leave blank to use the system name.") },
+                modifier = Modifier.fillMaxWidth(), singleLine = true, shape = RoundedCornerShape(16.dp))
             if (state.paired) {
-                TextButton(onClick = onScan, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp),
+                TextButton(onClick = onScan, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                     colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) {
                     Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Update connection with QR")
                 }
@@ -48,7 +51,7 @@ internal fun ConnectionSheet(state: ShelfState, manual: Boolean, link: String, o
                     Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
                 }
             }
-            TextButton(onClick = onManual, modifier = Modifier.heightIn(min = 48.dp),
+            TextButton(onClick = onManual, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) { Text(if (manual) "Hide pairing link" else "Use a pairing link") }
             if (manual) {
                 OutlinedTextField(value = link, onValueChange = onLink, label = { Text("Pairing link from your Mac") },

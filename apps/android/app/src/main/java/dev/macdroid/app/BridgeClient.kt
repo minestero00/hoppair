@@ -6,8 +6,9 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import org.json.JSONObject
 import org.json.JSONArray
-import java.io.DataInputStream
-import java.io.DataOutputStream
+import okio.buffer
+import okio.sink
+import okio.source
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
@@ -101,10 +102,12 @@ internal object RelayIdentity {
 }
 
 internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
+    private var cancellationCheck: () -> Unit = {}
+    fun setCancellationCheck(check: () -> Unit = {}) { cancellationCheck = check }
     private var localFailed = false
     private var relay: RelaySocket? = null
-    @Synchronized fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null): JSONObject =
-        if (action == "list") listPages() else callSingle(action, item, data, id)
+    @Synchronized fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null): JSONObject =
+        if (action == "list") listPages() else callSingle(action, item, data, id, deviceName)
     private fun listPages(): JSONObject {
         val items = JSONArray()
         val seenItems = mutableSetOf<String>()
@@ -135,35 +138,42 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
         } while (cursor != null)
         return checkNotNull(first).put("items", items).also { it.remove("nextCursor") }
     }
-    private fun callSingle(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null): JSONObject {
+    private fun callSingle(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null): JSONObject {
+        cancellationCheck()
         require(data == null || data.size <= MAX_FILE) { "Files must be 8 MiB or smaller." }
         val request = JSONObject().put("version", 1).put("requestId", UUID.randomUUID().toString())
             .put("issuedAt", System.currentTimeMillis() / 1000.0).put("action", action)
         item?.let { request.put("item", it) }
         data?.let { request.put("data", Base64.encodeToString(it, Base64.NO_WRAP)) }
         id?.let { request.put("id", it) }
+        deviceName?.let { request.put("deviceName", it) }
         val encrypted = PayloadCrypto.seal(request.toString().toByteArray(Charsets.UTF_8), pairing.key)
         require(encrypted.size <= MAX_FRAME) { "Transfer exceeds the size limit." }
         if (!localFailed) {
             try { return decode(local(encrypted), request.getString("requestId")) }
             catch (error: Exception) {
-                if (error is PeerRejected || error is PeerVerificationFailed || pairing.relay == null) throw error
+                if (error is java.util.concurrent.CancellationException || error is PeerRejected || error is PeerVerificationFailed || pairing.relay == null) throw error
                 localFailed = true
             }
         }
+        // Cancellation must not turn a failed local attempt into another network
+        // exchange after the app has moved to the background.
+        cancellationCheck()
         val channel = relay ?: RelaySocket(pairing).also { relay = it }
         return try { decode(channel.exchange(encrypted), request.getString("requestId")) }
         catch (error: Exception) { channel.abort(); relay = null; throw error }
     }
     private fun local(encrypted: ByteArray): ByteArray = Socket().use { socket ->
         socket.connect(InetSocketAddress(pairing.host, pairing.port), if (pairing.relay != null) 900 else 3500)
-        socket.soTimeout = 15000
-        val output = DataOutputStream(socket.getOutputStream())
+        // SO_TIMEOUT alone does not bound writes. Socket-backed Okio timeouts
+        // close this owned socket if either direction exceeds one total deadline.
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15)
+        val output = socket.sink().also { it.timeout().deadlineNanoTime(deadline) }.buffer()
+        val input = socket.source().also { it.timeout().deadlineNanoTime(deadline) }.buffer()
         output.writeInt(encrypted.size); output.write(encrypted); output.flush()
-        val input = DataInputStream(socket.getInputStream())
         val length = input.readInt()
         require(length in 28..MAX_FRAME) { "Invalid response size." }
-        ByteArray(length).also { input.readFully(it) }
+        input.readByteArray(length.toLong())
     }
     private fun decode(encrypted: ByteArray, requestId: String): JSONObject {
         val response = try { JSONObject(String(PayloadCrypto.open(encrypted, pairing.key), Charsets.UTF_8)) }
@@ -178,19 +188,38 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
     override fun close() { relay?.close(); relay = null }
 }
 
+/** Only allowlisted diagnostics reach UI; remote reason strings and exception text never do. */
+internal object RelayFailure {
+    fun message(status: Int? = null, closeCode: Int? = null, reason: String? = null, error: Exception? = null): String = when {
+        status == 401 || status == 403 -> "Relay registration was rejected. Check relay registration on your Mac."
+        status == 429 -> "Relay reconnect limit reached. Retrying shortly."
+        status == 503 || closeCode == 1013 -> "Your Mac is not available through the relay. Open Hoppair on your Mac."
+        status != null && status >= 500 -> "Relay is temporarily unavailable. Retrying shortly."
+        closeCode == 1008 && reason == "Transfer limit reached" -> "Relay transfer limit reached. Try again shortly."
+        closeCode == 1008 && reason == "Device registration revoked" -> "Relay registration was revoked. Check relay registration on your Mac."
+        closeCode == 1008 -> "Relay session ended. Retrying shortly."
+        error is javax.net.ssl.SSLException -> "Could not verify the relay’s secure connection. Check your network."
+        error is java.net.UnknownHostException -> "Could not find the relay. Check your internet connection."
+        error is java.net.SocketTimeoutException -> "Relay did not respond in time. Retrying shortly."
+        else -> "Relay connection interrupted. Retrying shortly."
+    }
+}
+
 private class RelaySocket(pairing: Pairing) : java.io.Closeable {
     private val opened = CountDownLatch(1)
     private val responses = LinkedBlockingQueue<Result<ByteArray>>(1)
     private val stateLock = Any()
     private val sendLock = Any()
     private var awaitingResponse = false
+    private var pongQueued = false
     private var terminalError: Exception? = null
     @Volatile private var openError: Exception? = null
+    @Volatile private var handshakeStatus: Int? = null
     private val socket: WebSocketClient
     init {
         val base = URI(checkNotNull(pairing.relay))
         val endpoint = URI(base.scheme, null, base.host, base.port, "/room/" + RelayIdentity.room(pairing.key), "role=phone", null)
-        socket = object : WebSocketClient(endpoint, BoundedRelayDraft(), mapOf("Authorization" to "Bearer " + RelayIdentity.auth(pairing.key)), 5000) {
+        socket = object : WebSocketClient(endpoint, BoundedRelayDraft { handshakeStatus = it }, mapOf("Authorization" to "Bearer " + RelayIdentity.auth(pairing.key)), 5000) {
             override fun onOpen(handshake: ServerHandshake) { opened.countDown() }
             override fun onMessage(message: String) {
                 fail(java.io.IOException("Invalid relay message.")); abort()
@@ -208,22 +237,26 @@ private class RelaySocket(pairing: Pairing) : java.io.Closeable {
                 }
             }
             override fun onError(error: Exception) {
-                val friendly = java.io.IOException("Could not connect through the relay. Check your Mac’s internet connection and open Hoppair.")
+                val friendly = java.io.IOException(RelayFailure.message(handshakeStatus, error = error))
                 openError = friendly; opened.countDown(); fail(friendly)
                 // The library may otherwise wait on a close handshake after malformed input.
                 runCatching { getSocket()?.close() }
             }
             override fun onClose(code: Int, reason: String, remote: Boolean) {
-                val error = java.io.IOException(if (code == 1008) "Relay transfer limit reached. Try again shortly or use the same Wi-Fi as your Mac." else "Connection lost. Retrying shortly.")
+                val error = java.io.IOException(RelayFailure.message(handshakeStatus, code, reason))
                 if (opened.count > 0) openError = error
                 opened.countDown(); fail(error)
             }
             override fun onWebsocketPing(connection: WebSocket, frame: Framedata) {
                 synchronized(sendLock) {
-                    // A slow reader cannot turn automatic PONG replies into an unbounded write queue.
-                    if (connection.hasBufferedData()) {
-                        fail(java.io.IOException("Relay is not reading responses.")); abort()
-                    } else super.onWebsocketPing(connection, frame)
+                    // A queued file/request is normal on a slow mobile uplink.
+                    // Allow one bounded PONG alongside it; coalesce further pings
+                    // until the writer drains, instead of aborting a valid transfer.
+                    if (!connection.hasBufferedData()) pongQueued = false
+                    if (!pongQueued) {
+                        pongQueued = true
+                        super.onWebsocketPing(connection, frame)
+                    }
                 }
             }
             override fun onSetSSLParameters(parameters: SSLParameters) {
@@ -251,7 +284,9 @@ private class RelaySocket(pairing: Pairing) : java.io.Closeable {
         }
         try {
             synchronized(sendLock) {
-                if (!socket.isOpen || socket.hasBufferedData()) throw java.io.IOException("Connection lost.")
+                // Calls are serialized and each authenticated response acknowledges
+                // the previous request. A queued PONG must not reject the next request.
+                if (!socket.isOpen) throw java.io.IOException("Connection lost.")
                 socket.send(payload)
             }
             return responses.poll(15, TimeUnit.SECONDS)?.getOrThrow() ?: throw java.net.SocketTimeoutException()

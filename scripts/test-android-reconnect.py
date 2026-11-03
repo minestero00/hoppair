@@ -16,6 +16,7 @@ root = Path(__file__).resolve().parents[1]
 artifacts = root / "artifacts"
 artifacts.mkdir(exist_ok=True)
 with socket.socket() as probe:
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         probe.bind(("127.0.0.1", 49273))
     except OSError:

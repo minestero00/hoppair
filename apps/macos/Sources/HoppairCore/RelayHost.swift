@@ -37,6 +37,8 @@ public enum RelayIdentity {
 // Owners must call stop() before replacing/releasing a running host.
 public final class RelayHost {
     public var onState: ((Bool) -> Void)?
+    /// Fixed, non-sensitive messages only; never exposes URLs, headers, or payloads.
+    public var onIssue: ((String?) -> Void)?
     private let base: String
     private let key: Data
     private let requestGuard: RequestReplayGuard
@@ -69,6 +71,7 @@ public final class RelayHost {
                         socket.cancel(with: .goingAway, reason: nil)
                         return
                     }
+                    self.onIssue?(nil)
                     self.onState?(true)
                     heartbeat = Task {
                         do {
@@ -94,7 +97,12 @@ public final class RelayHost {
                         guard payload.count <= Wire.maxFrameSize else { continue }
                         try await socket.send(.data(payload))
                     }
-                } catch { /* Retain queued items on the devices; reconnect without logging keys or content. */ }
+                } catch {
+                    if !Task.isCancelled, self.generation == generation {
+                        self.onIssue?(Self.issue(status: (socket.response as? HTTPURLResponse)?.statusCode,
+                                                 error: error))
+                    }
+                }
                 heartbeat?.cancel()
                 socket.cancel(with: .goingAway, reason: nil)
                 guard self.generation == generation else { return }
@@ -110,6 +118,25 @@ public final class RelayHost {
         task?.cancel(); task = nil
         socket?.cancel(with: .goingAway, reason: nil); socket = nil
         onState?(false)
+    }
+    static func issue(status: Int?, error: Error) -> String {
+        switch status ?? 0 {
+        case 401, 403: return "Relay registration was rejected. Check this Mac’s relay registration."
+        case 429: return "Relay reconnect limit reached. Retrying shortly."
+        case 500...599: return "Relay is temporarily unavailable. Retrying shortly."
+        default:
+            let code = (error as NSError).code
+            if (error as NSError).domain == NSURLErrorDomain {
+                if code == NSURLErrorNotConnectedToInternet { return "This Mac is offline. Waiting for internet access." }
+                if code == NSURLErrorTimedOut { return "Relay did not respond in time. Retrying shortly." }
+                if [NSURLErrorSecureConnectionFailed, NSURLErrorServerCertificateUntrusted,
+                    NSURLErrorServerCertificateHasBadDate, NSURLErrorServerCertificateHasUnknownRoot,
+                    NSURLErrorServerCertificateNotYetValid].contains(code) {
+                    return "Could not verify the relay’s secure connection. Check the network and relay address."
+                }
+            }
+            return "Relay connection interrupted. Retrying shortly."
+        }
     }
     private static func ping(_ socket: URLSessionWebSocketTask) async throws {
         try await RelayPing.wait { socket.sendPing(pongReceiveHandler: $0) }

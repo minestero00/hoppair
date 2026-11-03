@@ -44,7 +44,7 @@ class ReconnectTest {
         }
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)).use {
             compose.waitUntil(timeoutMillis = 15000) {
-                runCatching { compose.onNodeWithText("Mac connected").assertIsDisplayed(); true }.getOrDefault(false)
+                runCatching { compose.onNodeWithText("Connected to Studio Mac").assertIsDisplayed(); true }.getOrDefault(false)
             }
             compose.onNodeWithText("Scan QR to connect").assertDoesNotExist()
             compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()

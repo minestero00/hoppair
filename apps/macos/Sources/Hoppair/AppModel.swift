@@ -15,6 +15,20 @@ final class AppModel: ObservableObject {
     @Published var message = "Preparing your connection"
     @Published var error: String?
     @Published var port: UInt16 = 0
+    @Published var deviceName = UserDefaults.standard.string(forKey: "deviceName") ?? ""
+    @Published var peerName = UserDefaults.standard.string(forKey: "peerName") ?? "Android phone"
+    @Published var relayIssue: String?
+    var defaultDeviceName: String { isScreenshotMode ? "Studio Mac" : Self.cleanName(Host.current().localizedName ?? "Mac") }
+    var localDeviceName: String { Self.cleanName(deviceName).isEmpty ? defaultDeviceName : Self.cleanName(deviceName) }
+    static func cleanName(_ name: String) -> String {
+        let blocked = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "\u{202A}\u{202B}\u{202C}\u{202D}\u{202E}\u{2066}\u{2067}\u{2068}\u{2069}"))
+        let scalars = name.unicodeScalars.lazy.filter { !blocked.contains($0) }.prefix(64)
+        return String(String.UnicodeScalarView(scalars)).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    func saveDeviceName() {
+        if deviceName.unicodeScalars.count > 64 { deviceName = String(String.UnicodeScalarView(deviceName.unicodeScalars.prefix(64))) }
+        UserDefaults.standard.set(Self.cleanName(deviceName), forKey: "deviceName")
+    }
     @Published var lastSeen: Date?
     @Published var cameraRequest: String?
     @Published var showPairing = false
@@ -34,6 +48,8 @@ final class AppModel: ObservableObject {
     init() {
         if isScreenshotMode {
             preparing = false
+            deviceName = ""
+            peerName = "Android phone"
             relayAddress = ""
             message = "Sample content · no devices connected"
             let iconSize = Bundle.main.url(forResource: "BrandIcon", withExtension: "png")
@@ -99,6 +115,12 @@ final class AppModel: ObservableObject {
         let hash = SHA256.hash(data: Data(RelayIdentity.auth(key: key).utf8)).map { String(format: "%02x", $0) }.joined()
         return "{\"\(relayRoom)\":\"\(hash)\"}"
     }
+    func openPairing() {
+        if showCommands {
+            showCommands = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showPairing = true }
+        } else { showPairing = true }
+    }
     func openCommands() {
         if showPairing {
             showPairing = false
@@ -116,6 +138,7 @@ final class AppModel: ObservableObject {
             relayHost?.stop(); relayHost = nil
             let host = RelayHost(base: address, key: key, requestGuard: requestGuard) { [weak self] request in self?.handle(request) ?? BridgeResponse(ok: false) }
             host.onState = { [weak self] connected in self?.relayConnected = connected }
+            host.onIssue = { [weak self] issue in self?.relayIssue = issue }
             relayHost = host; try host.start()
             relayAddress = address; UserDefaults.standard.set(address, forKey: "relayAddress")
             return nil
@@ -128,14 +151,25 @@ final class AppModel: ObservableObject {
     }
     func refresh() { items = store?.items ?? [] }
     func handle(_ request: BridgeRequest) -> BridgeResponse {
-        lastSeen = Date()
         do {
             guard let store else { throw BridgeError.invalid("Could not open local storage.") }
             switch request.action {
             case "list": return try store.legacyList(cameraRequest: cameraRequest)
             case "listPage":
                 let page = try store.page(after: request.id)
-                return BridgeResponse(items: page.items, cameraRequest: cameraRequest, nextCursor: page.nextCursor)
+                var response = BridgeResponse(items: page.items, cameraRequest: cameraRequest, nextCursor: page.nextCursor)
+                response.deviceName = localDeviceName
+                response.syncAcknowledgement = true
+                return response
+            case "syncAck":
+                if let name = request.deviceName {
+                    let clean = Self.cleanName(name)
+                    if !clean.isEmpty && clean != peerName { peerName = clean; UserDefaults.standard.set(clean, forKey: "peerName") }
+                }
+                lastSeen = Date()
+                var response = BridgeResponse()
+                response.deviceName = localDeviceName
+                return response
             case "put":
                 guard var item = request.item else { throw BridgeError.invalid("Item is missing.") }
                 item.source = "Android"; item.pinned = false

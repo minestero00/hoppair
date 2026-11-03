@@ -169,7 +169,7 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
         if (updateState.sheet) UpdateSheet(updateState, onCheck = { updater.check() }, onUpdate = updater::update,
             onCancel = { updater.cancel() }, onDismiss = updater::dismiss)
         if (pairing) ConnectionSheet(state, manual, link, { link = it }, onManual = { manual = !manual }, onScan = scan,
-            onPair = { model.pair(link) { pairing = false; link = "" } }, onDismiss = { pairing = false })
+            onPair = { model.pair(link) { pairing = false; link = "" } }, onDismiss = { pairing = false }, onRename = model::renameDevice)
         if (attachments) AttachmentSheet(
             onFiles = { attachments = false; onFiles() }, onCamera = { attachments = false; onCamera() }, onDismiss = { attachments = false })
         state.entries.firstOrNull { it.id == selectedId }?.let { entry ->

@@ -6,7 +6,7 @@ The Mac hosts the canonical shelf. Android keeps a local cache and persistent ou
 
 Direct TCP uses port 49271. A frame is a 4-byte unsigned big-endian length followed by AES-256-GCM data: 12-byte nonce, ciphertext, 16-byte tag. The plaintext is UTF-8 JSON. Requests carry a version, UUID request ID, timestamp, and action; timestamps outside a 60-second window are rejected. A shared, bounded in-memory replay guard rejects reused request IDs across direct and relay connections.
 
-The optional WSS relay carries one sealed payload per binary message, without the TCP length prefix. Both transports include the request ID inside encrypted replies; Android requires an exact match before interpreting success or errors. An integrity/correlation failure does not trigger relay fallback. Routing identity and authentication are HMAC-SHA256 derivatives with distinct labels; the server verifies an operator-provisioned token hash without learning the content key.
+The optional WSS relay carries one sealed payload per binary message, without the TCP length prefix. Both transports include the request ID inside encrypted replies; Android requires an exact match before interpreting success or errors. Android reuses a healthy relay socket while foregrounded and closes it on failure, pairing changes, or backgrounding. An integrity/correlation failure does not trigger relay fallback. Routing identity and authentication are HMAC-SHA256 derivatives with distinct labels; the server verifies an operator-provisioned token hash without learning the content key.
 
 ## Shelf actions
 
@@ -17,6 +17,7 @@ The optional WSS relay carries one sealed payload per binary message, without th
 | `put` | Add an item with optional base64 file data |
 | `get` | Fetch one file by ID |
 | `cameraAck` | Acknowledge a photo request |
+| `syncAck` | Confirm a round trip and exchange device names |
 
 The Mac writes file data and an atomic index before acknowledging `put`. Stable item UUIDs make retries idempotent. Android marks an outbox item delivered only after success. Received files and links are never opened automatically.
 
@@ -37,3 +38,7 @@ Hoppair was previously named MacDroid. It keeps the original macOS bundle ID, An
 `services/connect/` serves the public Android Digital Asset Links association and redirects uninstalled devices to the static `site/connect/` guide. Pairing credentials stay in the URL fragment, which is not sent in HTTP requests. The guide can open the installed app through an explicit Android Intent or offer the release APK; installation still requires Android's user approval. A new external invite requires an in-app confirmation and cannot replace a different existing Mac pairing.
 
 There is no account, deferred-install token, or server-side pairing store. After installing an APK, return to the same guide and choose **Open Hoppair**. The built-in scanner decodes invites locally and also works without loading the website.
+
+## Device status
+
+`listPage` may advertise `syncAcknowledgement: true` and a `deviceName`. After merging the shelf and attempting its pending uploads, Android sends `syncAck` with its own name and waits for the correlated reply. Mac updates its connection freshness on this acknowledgement, not on receipt of an arbitrary request. This confirms a round trip, not delivery of rejected uploads; Android retains those items and shows the rejection. Relay reachability is shown separately. Names travel inside the encrypted envelope and are display labels, not an additional identity or authorization mechanism. Optional fields preserve older protocol clients; both apps must be updated for the new confirmation display.

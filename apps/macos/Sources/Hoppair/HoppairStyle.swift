@@ -57,6 +57,7 @@ struct HoppairButtonStyle: ButtonStyle {
                 .foregroundStyle(kind == .primary ? HoppairPalette.primaryForeground : HoppairPalette.primaryText)
                 .padding(.horizontal, kind == .row ? 0 : kind == .icon ? 7 : 11)
                 .padding(.vertical, kind == .row ? 0 : kind == .icon ? 7 : 8)
+                .frame(minWidth: kind == .icon ? 32 : nil, minHeight: kind == .row ? nil : 32)
                 .background(background, in: RoundedRectangle(cornerRadius: 8))
                 .opacity(enabled ? configuration.isPressed ? 0.78 : 1 : 0.38)
                 .contentShape(RoundedRectangle(cornerRadius: 8))
@@ -109,5 +110,24 @@ struct HoppairCanvas: View {
     var body: some View {
         LinearGradient(colors: [Color(nsColor: .windowBackgroundColor), HoppairPalette.surface],
                        startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+/// The complete disclosure row is a button, including the space after its label.
+struct HoppairDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { configuration.isExpanded.toggle() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold)).frame(width: 12).accessibilityHidden(true)
+                    configuration.label
+                    Spacer(minLength: 0)
+                }.frame(maxWidth: .infinity, minHeight: 40, alignment: .leading).contentShape(Rectangle())
+            }
+            .hoppairButton(.navigation)
+            .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+            if configuration.isExpanded { configuration.content }
+        }
     }
 }

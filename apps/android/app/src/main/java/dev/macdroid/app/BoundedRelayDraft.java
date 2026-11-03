@@ -26,12 +26,30 @@ public final class BoundedRelayDraft extends Draft_6455 {
   private long heldBytes;
   private int fragments;
 
-  public BoundedRelayDraft() { super(Collections.emptyList(), MAX_FRAME); }
-  @Override public Draft copyInstance() { return new BoundedRelayDraft(); }
+  private final java.util.function.IntConsumer statusObserver;
+  public BoundedRelayDraft() { this(status -> {}); }
+  public BoundedRelayDraft(java.util.function.IntConsumer statusObserver) {
+    super(Collections.emptyList(), MAX_FRAME);
+    this.statusObserver = statusObserver;
+  }
+  @Override public Draft copyInstance() { return new BoundedRelayDraft(statusObserver); }
 
   @Override public Handshakedata translateHandshake(ByteBuffer input) throws InvalidHandshakeException {
     ByteBuffer limited = input.duplicate();
     limited.limit(limited.position() + Math.min(limited.remaining(), MAX_HEADER));
+    // The upstream parser throws before returning non-101 responses. Capture
+    // only the fixed HTTP status prefix, never a server reason/header/body.
+    if (limited.remaining() >= 12) {
+      byte[] prefix = new byte[12];
+      limited.duplicate().get(prefix);
+      if (prefix[0] == 'H' && prefix[1] == 'T' && prefix[2] == 'T' && prefix[3] == 'P'
+          && prefix[4] == '/' && prefix[5] == '1' && prefix[6] == '.'
+          && (prefix[7] == '0' || prefix[7] == '1') && prefix[8] == ' '
+          && prefix[9] >= '1' && prefix[9] <= '5'
+          && prefix[10] >= '0' && prefix[10] <= '9' && prefix[11] >= '0' && prefix[11] <= '9') {
+        statusObserver.accept((prefix[9] - '0') * 100 + (prefix[10] - '0') * 10 + prefix[11] - '0');
+      }
+    }
     try {
       Handshakedata result = super.translateHandshake(limited);
       input.position(limited.position());

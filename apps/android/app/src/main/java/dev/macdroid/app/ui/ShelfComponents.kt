@@ -67,7 +67,7 @@ internal fun ConnectionCard(state: ShelfState, onClick: () -> Unit) {
                 Icon(Icons.Outlined.LaptopMac, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(if (state.online) "Mac connected" else "Waiting for Mac", style = MaterialTheme.typography.titleMedium)
+                Text(if (state.online) "Connected to ${state.peerName}" else "Waiting for ${state.peerName}", style = MaterialTheme.typography.titleMedium)
                 Text(if (!state.online && pending > 0) "$pending waiting · ${state.status}" else state.status,
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
@@ -212,7 +212,7 @@ internal fun WelcomePanel(busy: Boolean, onScan: () -> Unit, onManual: () -> Uni
             contentPadding = PaddingValues(16.dp)) {
             Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
         }
-        TextButton(onClick = onManual, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp),
+        TextButton(onClick = onManual, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) { Text("Use a pairing link") }
         Spacer(Modifier.height(16.dp))
         Text("On your Mac, open Hoppair → Connect Phone.", style = MaterialTheme.typography.bodySmall,

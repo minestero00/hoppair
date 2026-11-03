@@ -9,6 +9,8 @@ import android.os.Build
 import android.provider.Settings
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -83,7 +85,7 @@ class ShelfUiTest {
             compose.onNodeWithText("Connect", substring = false).performClick()
             compose.waitUntil(timeoutMillis = 15000) { PairingVault(context).load() == incoming.dataString }
             compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()
-            waitText("Mac connected")
+            waitText("Connected to Studio Mac")
             assertArrayEquals(Pairing.parse(checkNotNull(originalPairing)).key, Pairing.parse(checkNotNull(PairingVault(context).load())).key)
             // ActivityScenario recreates by matching the original launch intent.
             scenario.onActivity { it.intent = checkNotNull(launchIntent) }
@@ -91,6 +93,13 @@ class ShelfUiTest {
             tapDescription("Mac connection")
             waitText("Your Mac is saved")
             waitText("Update connection with QR")
+            val manualRow = compose.onNodeWithText("Use a pairing link")
+            manualRow.performScrollTo().assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(280.dp)
+            // Click the empty trailing portion, not the text label.
+            manualRow.performTouchInput { click(Offset(width - 8f, height / 2f)) }
+            compose.onNodeWithText("Pairing link from your Mac").assertExists()
+            compose.onNodeWithText("Hide pairing link").performScrollTo().performTouchInput { click(Offset(8f, height / 2f)) }
+            compose.onNodeWithText("Pairing link from your Mac").assertDoesNotExist()
             screenshot(screenshots, "saved-connection")
             tapDescription("Close")
             tapText("A few things for tomorrow")

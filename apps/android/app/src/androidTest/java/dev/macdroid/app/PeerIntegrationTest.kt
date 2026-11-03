@@ -15,7 +15,15 @@ class PeerIntegrationTest {
         val encoded = Base64.encodeToString(ByteArray(32) { 7 }, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
         val relayMode = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("relay") == "true"
         val link = if (relayMode) "hoppair://127.0.0.1:1?key=$encoded&relay=ws%3A%2F%2F10.0.2.2%3A8787" else "hoppair://10.0.2.2:49272?key=$encoded"
-        BridgeClient(Pairing.parse(link)).use { client ->
+        val fixtureMode = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("wssFixture") == "true"
+        val pairing = if (fixtureMode) {
+            val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+            val fixture = JSONObject(java.io.File(context.filesDir, "wss-fixture.json").readText())
+            val relay = fixture.getString("relay")
+            require(relay.startsWith("wss://hoppair-wss-test-") && relay.endsWith(".workers.dev"))
+            Pairing("127.0.0.1", 1, Base64.decode(fixture.getString("key"), Base64.DEFAULT), relay)
+        } else Pairing.parse(link)
+        BridgeClient(pairing).use { client ->
         val items = client.call("list").getJSONArray("items")
         val fileItem = items.getJSONObject(0)
         assertEquals("Shared from Mac – café.txt", fileItem.getString("filename"))

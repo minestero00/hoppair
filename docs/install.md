@@ -26,7 +26,9 @@ You can also scan inside Hoppair with **Scan QR to connect**. This decodes the i
 
 A pairing link is available under **More connection options** if scanning is unavailable. Treat QR codes and pairing links as private credentials.
 
-Add a file, link, or note on either device. On Android, other apps can send items through **Share → Hoppair**. The Mac's **Take Photo** action asks the phone to open its camera; confirm on the phone.
+Name your devices in the connection settings, or leave the name blank to use the system device name. The other device shows this name after syncing. **Relay ready** means the Mac can reach the relay; the phone is shown as connected only after it confirms a round trip. Update both apps to see this confirmation.
+
+Add a file, link, or note on either device. On Mac, press **⌘Return** to send the composer, **⌘K** for commands, or **⇧⌘Space** to open commands from another app. On Android, other apps can send items through **Share → Hoppair**. The Mac's **Take Photo** action asks the phone to open its camera; confirm on the phone.
 
 ## Away from home
 

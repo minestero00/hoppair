@@ -22,6 +22,48 @@ class ConnectionSecurityTest {
     private val key = ByteArray(32) { 7 }
     private val encodedKey = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
 
+    @Test fun stalledLocalReaderCannotHoldLargeUploadBeyondTotalDeadline() {
+        val server = ServerSocket(0)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val accepted = java.util.concurrent.CountDownLatch(1)
+        val worker = thread(isDaemon = true, name = "stalled-local-peer") {
+            server.accept().use { socket ->
+                socket.receiveBufferSize = 1024
+                accepted.countDown()
+                release.await(25, java.util.concurrent.TimeUnit.SECONDS)
+            }
+        }
+        val started = System.nanoTime()
+        try {
+            BridgeClient(Pairing("127.0.0.1", server.localPort, key)).use { client ->
+                assertThrows(java.io.IOException::class.java) { client.call("put", data = ByteArray(MAX_FILE)) }
+            }
+            assertEquals(0L, accepted.count)
+            val elapsed = (System.nanoTime() - started) / 1_000_000_000.0
+            assertTrue("Write exceeded bounded deadline: $elapsed", elapsed < 22)
+        } finally {
+            release.countDown(); server.close(); worker.join(2000)
+            assertFalse(worker.isAlive)
+        }
+    }
+
+    @Test fun cancellationStopsNextExchangeAndDoesNotFallBackAfterLocalFailure() {
+        ServerSocket(0).use { relay ->
+            relay.soTimeout = 250
+            BridgeClient(Pairing("127.0.0.1", 1, key, "ws://127.0.0.1:${relay.localPort}")).use { client ->
+                var checks = 0
+                client.setCancellationCheck {
+                    if (++checks == 2) throw java.util.concurrent.CancellationException()
+                }
+                assertThrows(java.util.concurrent.CancellationException::class.java) { client.call("list") }
+                assertEquals(2, checks)
+                assertThrows(java.net.SocketTimeoutException::class.java) { relay.accept().close() }
+                client.setCancellationCheck { throw java.util.concurrent.CancellationException() }
+                assertThrows(java.util.concurrent.CancellationException::class.java) { client.call("list") }
+            }
+        }
+    }
+
     @Test fun directRepliesMustAuthenticateAndMatchBeforeSuccessOrErrorIsUsed() {
         withPeer { request -> JSONObject().put("ok", true).put("requestId", request.getString("requestId")).put("items", JSONArray()) }.use { peer ->
             BridgeClient(peer.pairing).use { assertTrue(it.call("list").getBoolean("ok")) }

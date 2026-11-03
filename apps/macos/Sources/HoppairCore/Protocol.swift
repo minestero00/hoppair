@@ -30,6 +30,7 @@ public struct BridgeRequest: Codable, Sendable {
     public var requestId: String = UUID().uuidString
     public var issuedAt: Double = Date().timeIntervalSince1970
     public var action: String
+    public var deviceName: String?
     public var item: ShelfItem?
     public var data: String?
     public var id: String?
@@ -45,6 +46,8 @@ public struct BridgeResponse: Codable, Sendable {
     public var data: String?
     public var cameraRequest: String?
     public var nextCursor: String?
+    public var deviceName: String?
+    public var syncAcknowledgement: Bool?
     public init(ok: Bool = true, error: String? = nil, items: [ShelfItem]? = nil,
                 data: String? = nil, cameraRequest: String? = nil, nextCursor: String? = nil) {
         self.ok = ok; self.error = error; self.items = items; self.data = data; self.cameraRequest = cameraRequest; self.nextCursor = nextCursor

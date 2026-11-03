@@ -75,6 +75,39 @@ private final class LoopbackRelay {
 
 final class RelayHostTests: XCTestCase {
     @MainActor
+    func testDiagnosticsClassifyHandshakeWithoutLeakingErrorText() {
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut,
+                            userInfo: [NSLocalizedDescriptionKey: "SECRET URL"])
+        XCTAssertTrue(RelayHost.issue(status: 401, error: error).contains("registration"))
+        XCTAssertTrue(RelayHost.issue(status: 429, error: error).contains("reconnect limit"))
+        XCTAssertTrue(RelayHost.issue(status: 503, error: error).contains("unavailable"))
+        XCTAssertTrue(RelayHost.issue(status: nil, error: error).contains("respond in time"))
+        XCTAssertFalse(RelayHost.issue(status: nil, error: error).contains("SECRET"))
+    }
+
+    @MainActor
+    func testRejectedHTTPHandshakeNeverReportsReadyAndExplainsRegistration() async throws {
+        let server = try LoopbackRelay(webSocket: false)
+        defer { server.stop() }
+        let host = RelayHost(base: try await server.start(), key: Data(repeating: 7, count: 32)) { _ in BridgeResponse() }
+        defer { host.stop() }
+        let rejected = expectation(description: "registration rejection reported")
+        var ready = false
+        server.onAccept = {
+            server.connections.last?.send(content: Data("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8),
+                                          completion: .contentProcessed { _ in })
+        }
+        host.onState = { ready = ready || $0 }
+        host.onIssue = { issue in
+            XCTAssertTrue(issue?.contains("registration was rejected") == true)
+            rejected.fulfill()
+        }
+        try host.start()
+        await fulfillment(of: [rejected], timeout: 5)
+        XCTAssertFalse(ready)
+    }
+
+    @MainActor
     func testRelayRejectsReplayWithCorrelatedResponseWithoutRepeatingHandler() async throws {
         let server = try LoopbackRelay()
         defer { server.stop() }

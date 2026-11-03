@@ -70,7 +70,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { while (isActive) { updater.check(manual = false); delay(60_000) } }
-                while (isActive) { model.sync(); delay(3000) }
+                try { while (isActive) { model.sync(); delay(3000) } }
+                finally { model.pauseConnection() }
             }
         }
     }
