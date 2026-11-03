@@ -46,9 +46,9 @@ If you installed this project's MacDroid v0.1.0 release, install the official Ho
 
 ## App updates
 
-Install v0.1.6 once on **Mac first, then Android**. Older versions do not have the built-in updater. New Android builds require the Mac's correlated replies and paged shelf protocol.
+If you have a version older than v0.1.6, manually install the latest release on **Mac first, then Android**. Those older versions do not have the built-in updater. New Android builds require the Mac's correlated replies and paged shelf protocol.
 
-From v0.1.6, Mac checks automatically and offers download, installation, and relaunch through Sparkle. Use **Hoppair → Check for Updates…** to check manually. Android checks when opened; use **More → Check for updates** for a manual check. Tap **Update**, allow Hoppair as an installation source if Android asks, then confirm the system installer. Your shelf and pairing stay in place.
+From v0.1.6, Mac checks automatically and offers download, installation, and relaunch through Sparkle. Use **Hoppair → Check for Updates…** to check manually. Android checks when opened; use **More → Check for updates** for a manual check. Tap **Download update**, allow Hoppair as an installation source if Android asks, then confirm the system installer. Your shelf and pairing stay in place.
 
 The updater removes its own temporary downloads and installation files. Android also removes completed APKs when the updated app opens, and prunes stale downloads after 24 hours. Files you downloaded manually to Downloads are yours to remove. Mac releases use ZIP archives, not DMG installers.
 

@@ -31,8 +31,10 @@ import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material.icons.outlined.FlashlightOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -163,53 +165,89 @@ class QrScannerActivity : ComponentActivity() {
             title = { Text("Scanner privacy") },
             text = { Text("QR images and their contents are processed on your phone. Google ML Kit collects SDK performance and usage metrics. Its terms and privacy policy are available at developers.google.com/ml-kit/terms.") },
             confirmButton = { TextButton(onClick = { showPrivacy = false }) { Text("Done") } })
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
-            AndroidView(factory = { context -> PreviewView(context).apply {
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                scaleType = PreviewView.ScaleType.FIT_CENTER
-                controller = this@QrScannerActivity.controller
-                contentDescription = "Camera preview. Tap to focus; pinch to zoom."
-                // Binding can finish before PreviewView attaches, leaving cameraInfo null.
-                // Observe again once the preview has acquired the actual camera.
-                previewStreamState.observe(this@QrScannerActivity) { observeCamera() }
-            } }, modifier = Modifier.fillMaxSize())
-            Column(Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(color = Color.Black.copy(alpha = 0.8f), shape = RoundedCornerShape(20.dp)) {
-                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Scan to connect", color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { delivered = true; finish() }, modifier = Modifier.size(48.dp)) { Icon(Icons.Outlined.Close, "Close scanner", tint = Color.White) }
-                    }
-                }
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val guide = minOf(300.dp, maxWidth, maxHeight - 24.dp)
-                    if (guide >= 80.dp) Box(Modifier.size(guide)
-                        .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(24.dp)))
-                }
-                Surface(modifier = Modifier.weight(1f, fill = false), color = Color.Black.copy(alpha = 0.86f), shape = RoundedCornerShape(20.dp)) {
-                    Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(message, color = Color.White, style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite })
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            for (level in listOf(1f, 2f, 3f)) {
-                                TextButton(onClick = { setZoom(level) }, enabled = ready && level <= maximumZoom,
-                                    modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
-                                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White, disabledContentColor = Color.Gray)) {
-                                    Text("${level.toInt()}×", style = if (kotlin.math.abs(zoom - level) < 0.15f) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                            if (flashAvailable) IconButton(onClick = {
-                                val next = !torch
-                                controller.enableTorch(next).addListener({ if (!destroyed) torch = controller.cameraInfo?.torchState?.value == androidx.camera.core.TorchState.ON }, ContextCompat.getMainExecutor(this@QrScannerActivity))
-                            }, enabled = ready, modifier = Modifier.size(48.dp)) {
-                                Icon(if (torch) Icons.Outlined.FlashlightOff else Icons.Outlined.FlashlightOn, if (torch) "Turn flashlight off" else "Turn flashlight on", tint = Color.White)
-                            }
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+            if (maxWidth >= 640.dp && maxWidth > maxHeight) {
+                Column(Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp)) {
+                    ScannerHeader()
+                    Row(Modifier.weight(1f).fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        // Keep the guide at the preview's optical center for focus and automatic zoom.
+                        Box(Modifier.weight(1f).fillMaxHeight()) {
+                            CameraPreview(Modifier.fillMaxSize())
+                            ScannerGuide(Modifier.fillMaxSize(), portrait = false)
                         }
-                        TextButton(onClick = { delivered = true; setResult(RESULT_OK, Intent().putExtra(USE_LINK, true)); finish() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Use a pairing link instead") }
-                        TextButton(onClick = { showPrivacy = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) { Text("Scanner privacy") }
+                        ScannerControls(Modifier.width(280.dp).fillMaxHeight())
                     }
                 }
+            } else {
+                val portrait = maxHeight >= maxWidth
+                val controlsHeight = maxHeight * 0.45f
+                Column(Modifier.fillMaxSize().safeDrawingPadding().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    ScannerHeader()
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        CameraPreview(Modifier.fillMaxSize())
+                        ScannerGuide(Modifier.fillMaxSize(), portrait)
+                    }
+                    ScannerControls(Modifier.heightIn(max = controlsHeight))
+                }
+            }
+        }
+    }
+
+    @Composable private fun CameraPreview(modifier: Modifier) {
+        AndroidView(factory = { context -> PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+            controller = this@QrScannerActivity.controller
+            contentDescription = "Camera preview. Tap to focus; pinch to zoom."
+            // Binding can finish before PreviewView attaches, leaving cameraInfo null.
+            previewStreamState.observe(this@QrScannerActivity) { observeCamera() }
+        } }, modifier = modifier.clipToBounds().testTag("qr-preview"))
+    }
+
+    @Composable private fun ScannerHeader() {
+        Surface(color = Color.Black.copy(alpha = 0.8f), shape = RoundedCornerShape(20.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Scan to connect", color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                IconButton(onClick = { delivered = true; finish() }, modifier = Modifier.size(48.dp)) { Icon(Icons.Outlined.Close, "Close scanner", tint = Color.White) }
+            }
+        }
+    }
+
+    @Composable private fun ScannerGuide(modifier: Modifier, portrait: Boolean) {
+        BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+            // Keep the square within a centered 16:9 frame, including FIT_CENTER letterboxing.
+            val aspect = if (portrait) 9f / 16f else 16f / 9f
+            val guide = minOf(300.dp, minOf(maxWidth, maxHeight * aspect) - 24.dp,
+                minOf(maxHeight, maxWidth / aspect) - 24.dp)
+            if (guide >= 80.dp) Box(Modifier.size(guide).testTag("qr-guide")
+                .border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(24.dp)))
+        }
+    }
+
+    @Composable private fun ScannerControls(modifier: Modifier) {
+        Surface(modifier = modifier, color = Color.Black.copy(alpha = 0.86f), shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(message, color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite })
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    for (level in listOf(1f, 2f, 3f)) {
+                        TextButton(onClick = { setZoom(level) }, enabled = ready && level <= maximumZoom,
+                            modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp),
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White, disabledContentColor = Color.Gray)) {
+                            Text("${level.toInt()}×", style = if (kotlin.math.abs(zoom - level) < 0.15f) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    if (flashAvailable) IconButton(onClick = {
+                        val next = !torch
+                        controller.enableTorch(next).addListener({ if (!destroyed) torch = controller.cameraInfo?.torchState?.value == androidx.camera.core.TorchState.ON }, ContextCompat.getMainExecutor(this@QrScannerActivity))
+                    }, enabled = ready, modifier = Modifier.size(48.dp)) {
+                        Icon(if (torch) Icons.Outlined.FlashlightOff else Icons.Outlined.FlashlightOn, if (torch) "Turn flashlight off" else "Turn flashlight on", tint = Color.White)
+                    }
+                }
+                TextButton(onClick = { delivered = true; setResult(RESULT_OK, Intent().putExtra(USE_LINK, true)); finish() }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Use a pairing link instead") }
+                TextButton(onClick = { showPrivacy = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.LightGray)) { Text("Scanner privacy") }
             }
         }
     }
