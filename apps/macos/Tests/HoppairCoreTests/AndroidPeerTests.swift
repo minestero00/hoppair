@@ -21,7 +21,16 @@ final class AndroidPeerTests: XCTestCase {
                 case "list": return try store.legacyList()
                 case "listPage":
                     let page = try store.page(after: request.id)
-                    return BridgeResponse(items: page.items, nextCursor: page.nextCursor)
+                    var response = BridgeResponse(items: page.items, nextCursor: page.nextCursor)
+                    response.supportsDeletion = true
+                    return response
+                case "delete":
+                    try store.delete(request.id!)
+                    return BridgeResponse()
+                case "deleted":
+                    var response = BridgeResponse()
+                    response.deleted = try store.deletedIDs(in: request.ids ?? [])
+                    return response
                 case "get": return BridgeResponse(data: try store.content(request.id!).base64EncodedString())
                 case "put":
                     let item = request.item!

@@ -201,6 +201,32 @@ class SyncRecoveryTest {
         assertFalse(ShelfRepository(context).entries.single().pinned)
     }
 
+    @Test fun deletionResponseIsValidatedBeforeAnyRemoval() = repository { _, repo ->
+        repo.addText("Keep queued")
+        val id = repo.entries.single().id
+        assertThrows(IllegalArgumentException::class.java) { repo.applyDeletions(JSONArray().put(id).put(id), setOf(id)) }
+        assertThrows(IllegalArgumentException::class.java) { repo.applyDeletions(JSONArray().put(UUID.randomUUID().toString()), setOf(id)) }
+        assertEquals(id, repo.entries.single().id)
+        repo.applyDeletions(JSONArray().put(id), setOf(id))
+        assertTrue(repo.entries.isEmpty())
+    }
+
+    @Test fun restartReclaimsPayloadLeftAfterDeletionIndexCommit() = repository { context, repo ->
+        val file = item("file").put("size", 3)
+        repo.merge(JSONArray().put(file)) { byteArrayOf(1, 2, 3) }
+        val id = file.getString("id")
+        repo.remove(setOf(id))
+        // Crash-equivalent state: index removal is durable, payload unlink has not happened.
+        repo.file(id).writeBytes(byteArrayOf(1, 2, 3))
+        val unrelated = File(repo.file(id).parentFile, "keep.txt").apply { writeText("fixture") }
+        val directory = repo.file(UUID.randomUUID().toString()).apply { mkdir() }
+        val child = File(directory, "keep.txt").apply { writeText("fixture") }
+        assertTrue(ShelfRepository(context).entries.isEmpty())
+        assertFalse(repo.file(id).exists())
+        assertTrue(unrelated.exists())
+        assertTrue(child.exists())
+    }
+
     private fun item(kind: String) = JSONObject().put("id", UUID.randomUUID().toString()).put("kind", kind)
         .put("title", "Public fixture").put("text", "A new note from Mac").put("filename", "fixture.bin")
         .put("mime", "application/octet-stream").put("size", 0).put("createdAt", 1.0).put("source", "Mac").put("pinned", false)

@@ -117,6 +117,15 @@ struct ShelfView: View {
         .tint(accent).frame(minWidth: 800, minHeight: 600)
         .sheet(isPresented: $model.showPairing) { PairingView().environmentObject(model).presentationBackground(.clear) }
         .sheet(isPresented: $model.showCommands) { commands }
+        .alert("Delete from the shared shelf?", isPresented: Binding(get: { model.itemToDelete != nil }, set: { if !$0 { model.itemToDelete = nil } }), presenting: model.itemToDelete) { item in
+            Button("Cancel", role: .cancel) { model.itemToDelete = nil }
+            Button("Delete", role: .destructive) {
+                model.itemToDelete = nil
+                model.deleteItem(item)
+            }
+        } message: { item in
+            Text("“\(item.title)” will be removed from this Mac and your phone when it next syncs. Copies saved outside Hoppair are kept. Both apps need the latest version to sync deletions.")
+        }
         .alert("Could Not Complete the Action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }

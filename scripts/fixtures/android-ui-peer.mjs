@@ -2,7 +2,7 @@
 import net from 'node:net';
 import crypto from 'node:crypto';
 import {readFileSync} from 'node:fs';
-const key=Buffer.alloc(32,7), files=new Map();
+const key=Buffer.alloc(32,7), files=new Map(), deleted=new Set();
 const item=(kind,title,extra={})=>({id:crypto.randomUUID(),kind,title,size:0,source:'Mac',pinned:false,createdAt:Date.now()/1000,...extra});
 const file=item('file','Project brief.txt',{filename:'Project brief.txt',mime:'text/plain',size:24});
 files.set(file.id,Buffer.from('A small preview document'));
@@ -26,13 +26,16 @@ net.createServer(socket=>{
    decipher.setAuthTag(frame.subarray(-16));
    const req=JSON.parse(Buffer.concat([decipher.update(frame.subarray(12,-16)),decipher.final()]));
    let result={ok:true,requestId:req.requestId};
-   if(req.action==='list'||req.action==='listPage')result={...result,items,cameraRequest:null,deviceName:"Studio Mac",syncAcknowledgement:true};
+   if(req.action==='list'||req.action==='listPage')result={...result,items,cameraRequest:null,deviceName:"Studio Mac",syncAcknowledgement:true,supportsDeletion:true};
    if(req.action==='syncAck') {
     if(typeof req.deviceName !== 'string' || !req.deviceName.trim() || [...req.deviceName].length > 64) throw new Error('Invalid device name');
     result.deviceName='Studio Mac';
    }
+   if(req.action==='deleted')result.deleted=(req.ids??[]).filter(id=>deleted.has(id));
+   if(req.action==='delete'){deleted.add(req.id);const index=items.findIndex(item=>item.id===req.id);if(index>=0)items.splice(index,1);files.delete(req.id);}
    if(req.action==='get')result.data=files.get(req.id)?.toString('base64');
-   if(req.action==='put'&&!items.some(i=>i.id===req.item.id)){items.unshift(req.item);if(req.data)files.set(req.item.id,Buffer.from(req.data,'base64'));}
+   if(req.action==='put'&&deleted.has(req.item.id))result={...result,ok:false,error:'Item was deleted'};
+   else if(req.action==='put'&&!items.some(i=>i.id===req.item.id)){items.unshift(req.item);if(req.data)files.set(req.item.id,Buffer.from(req.data,'base64'));}
    const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key,iv);
    const response=Buffer.concat([iv,cipher.update(JSON.stringify(result)),cipher.final(),cipher.getAuthTag()]);
    const header=Buffer.alloc(4);header.writeUInt32BE(response.length);socket.end(Buffer.concat([header,response]));

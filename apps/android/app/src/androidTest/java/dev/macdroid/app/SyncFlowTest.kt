@@ -93,6 +93,56 @@ class SyncFlowTest {
         }
     }
 
+    @Test fun deletionReceiptsRemoveQueuedRetriesAndStaleSnapshotBeforeUpload() {
+        var queuedID = ""
+        val file = item("file").put("size", 3)
+        val note = item("text")
+        val actions = mutableListOf<String>()
+        peer(3) { request ->
+            actions += request.getString("action")
+            when (request.getString("action")) {
+                "listPage" -> JSONObject().put("items", JSONArray().put(file).put(note)).put("supportsDeletion", true).put("syncAcknowledgement", true)
+                "deleted" -> {
+                    assertEquals(3, request.getJSONArray("ids").length())
+                    JSONObject().put("deleted", JSONArray().put(queuedID).put(file.getString("id")))
+                }
+                else -> JSONObject()
+            }
+        }.use { server ->
+            withModel(server.port) { model ->
+                queuedID = model.ui.value.entries.single().id
+                model.sync()
+                assertEquals(listOf("listPage", "deleted", "syncAck"), actions)
+                assertEquals(note.getString("id"), model.ui.value.entries.single().id)
+                assertTrue(model.ui.value.canDelete)
+            }
+        }
+    }
+
+    @Test fun lostDeleteAcknowledgementReconcilesOnNextSync() {
+        var queuedID = ""
+        var deleted = false
+        peer(6) { request ->
+            when (request.getString("action")) {
+                "listPage" -> JSONObject().put("items", JSONArray()).put("supportsDeletion", true)
+                "deleted" -> JSONObject().put("deleted", if (deleted) JSONArray().put(queuedID) else JSONArray())
+                "delete" -> { assertEquals(queuedID, request.getString("id")); deleted = true; null }
+                else -> JSONObject()
+            }
+        }.use { server ->
+            withModel(server.port) { model ->
+                queuedID = model.ui.value.entries.single().id
+                model.sync()
+                InstrumentationRegistry.getInstrumentation().runOnMainSync { model.deleteEntry(queuedID) }
+                withTimeout(10_000) { while (model.ui.value.busy || model.ui.value.error == null) delay(20) }
+                assertEquals(queuedID, model.ui.value.entries.single().id)
+                model.sync()
+                assertTrue(model.ui.value.entries.isEmpty())
+                assertTrue(model.ui.value.online)
+            }
+        }
+    }
+
     private fun withModel(port: Int, block: suspend (ShelfViewModel) -> Unit) = runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val base = instrumentation.targetContext

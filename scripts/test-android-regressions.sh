@@ -18,7 +18,7 @@ adb -s "$SERIAL" shell am instrument -w -e class "$SELECTOR" dev.macdroid.app.te
 cat "$ROOT/artifacts/android-regression-test.log"
 # Android's instrumentation command can exit zero even when its tests fail.
 # Update this count when adding/removing selected tests; a partial suite must not pass.
-rg -q '^OK \(44 tests\)$' "$ROOT/artifacts/android-regression-test.log"
+rg -q '^OK \(48 tests\)$' "$ROOT/artifacts/android-regression-test.log"
 for test_class in "${CLASSES[@]}"; do
     rg -q "^dev[.]macdroid[.]app[.]$test_class:" "$ROOT/artifacts/android-regression-test.log"
 done

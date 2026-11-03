@@ -38,7 +38,7 @@ Pairing is saved securely. Reopen both apps to reconnect automatically; no new Q
 
 If you reinstall Hoppair on your Mac or switch Macs, scan the new QR. Android asks before replacing a different saved connection and explains which waiting items will be sent. Canceling or a failed connection check keeps the previous pairing.
 
-Limits: 8 MiB per file, 64 KiB per text item, 500 shelf items. This release targets one Mac and one Android phone. Full shelves reject new items; there is no item deletion or in-app key rotation yet.
+Limits: 8 MiB per file, 64 KiB per text item, 500 shelf items. This release targets one Mac and one Android phone. Use **Delete from shared shelf** in an item’s details to free space. Android deletion needs the Mac online; deletions made on Mac reach the phone when it reconnects. Update both apps to sync deletions. There is no in-app key rotation yet.
 
 ## Updating from MacDroid
 

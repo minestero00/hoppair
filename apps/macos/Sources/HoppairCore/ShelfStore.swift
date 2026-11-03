@@ -10,10 +10,12 @@ public final class ShelfStore {
     public private(set) var items: [ShelfItem] = []
     public let root: URL
     private let index: URL
+    private let deletions: DeletionJournal
     public init(root: URL) throws {
         self.root = root; self.index = root.appendingPathComponent("shelf.json")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
                                                attributes: [.posixPermissions: 0o700])
+        deletions = try DeletionJournal(root: root)
         if FileManager.default.fileExists(atPath: index.path) {
             items = try JSONDecoder().decode([ShelfItem].self, from: Data(contentsOf: index))
             // Older versions accepted scheme-only links such as https:foo.
@@ -26,6 +28,9 @@ public final class ShelfStore {
                 }
             }
         }
+        let removed = try deletions.contains(items.map { $0.id.lowercased() })
+        items.removeAll { removed.contains($0.id.lowercased()) }
+        cleanupDeletedFiles()
     }
     /// UUID cursors anchor the previous page's last item. Prepending new items
     /// between pages cannot move the cursor or duplicate already returned items.
@@ -80,6 +85,7 @@ public final class ShelfStore {
     }
     public func put(_ input: ShelfItem, content: Data? = nil) throws {
         guard UUID(uuidString: input.id) != nil else { throw BridgeError.invalid("Invalid item ID.") }
+        guard try deletions.contains([input.id.lowercased()]).isEmpty else { throw BridgeError.invalid("This item was deleted from the shelf.") }
         if items.contains(where: { $0.id.lowercased() == input.id.lowercased() }) { return } // Retry after a lost acknowledgement.
         guard items.count < 500 else { throw BridgeError.invalid("The shelf is full (500 items).") }
         guard input.title.utf8.count <= 4096, input.title.count <= 512, ["text", "link", "file"].contains(input.kind),
@@ -117,5 +123,38 @@ public final class ShelfStore {
         next[i].pinned.toggle()
         try JSONEncoder().encode(next).write(to: index, options: .atomic)
         items = next
+    }
+
+    public func deletedIDs(in ids: [String]) throws -> [String] {
+        guard ids.count <= 1000, ids.allSatisfy({ UUID(uuidString: $0) != nil }) else { throw BridgeError.invalid("Invalid deletion query.") }
+        return try deletions.contains(ids.map { $0.lowercased() }).sorted()
+    }
+
+    public func delete(_ id: String) throws {
+        guard UUID(uuidString: id) != nil else { throw BridgeError.invalid("Invalid item ID.") }
+        let id = id.lowercased()
+        // The receipt is the commit point. Even a stale index or a delayed put
+        // cannot restore the item after this durable write succeeds.
+        try deletions.record(id)
+        items.removeAll { $0.id.lowercased() == id }
+        // The journal remains authoritative if index compaction fails.
+        try? JSONEncoder().encode(items).write(to: index, options: .atomic)
+        cleanupDeletedFiles(preferred: id)
+    }
+
+    private func cleanupDeletedFiles(preferred: String? = nil) {
+        guard let queued = try? deletions.pendingCleanup() else { return }
+        let pending = preferred.map { id in [id] + queued.filter { $0 != id } } ?? queued
+        for id in pending {
+            do {
+                let url = try fileURL(id)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                    guard attributes[.type] as? FileAttributeType != .typeDirectory else { continue }
+                    try FileManager.default.removeItem(at: url)
+                }
+                try deletions.markCleaned(id)
+            } catch { /* Keep the cleanup receipt for a later retry. */ }
+        }
     }
 }

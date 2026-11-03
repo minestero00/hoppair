@@ -72,6 +72,28 @@ internal class ShelfRepository(private val context: Context) {
     private val index = AtomicFile(File(context.filesDir, "shelf.json"))
     var entries: List<ShelfEntry> = load()
         private set
+    init { cleanupOrphanedPayloads() }
+    private fun cleanupOrphanedPayloads() {
+        val indexed = entries.map { it.id }.toSet()
+        // Only recognized regular payload files in our private directory are eligible.
+        // Loading a corrupt index fails before this runs, preserving all payloads.
+        runCatching {
+            java.nio.file.Files.newDirectoryStream(root.toPath()).use { paths ->
+                for (path in paths) {
+                    val filename = path.fileName.toString()
+                    val name = when {
+                        filename.endsWith(".new") -> filename.removeSuffix(".new")
+                        filename.endsWith(".bak") -> filename.removeSuffix(".bak")
+                        else -> filename
+                    }
+                    val id = runCatching { UUID.fromString(name).toString() }.getOrNull() ?: continue
+                    if (!id.equals(name, ignoreCase = true) || id in indexed) continue
+                    if (java.nio.file.Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                        runCatching { java.nio.file.Files.deleteIfExists(path) }
+                }
+            }
+        }
+    }
     private fun load(): List<ShelfEntry> {
         if (!index.baseFile.exists() && !File(index.baseFile.path + ".bak").exists()) return emptyList()
         val seen = mutableSetOf<String>()
@@ -189,6 +211,22 @@ internal class ShelfRepository(private val context: Context) {
         catch (error: Exception) { AtomicFile(file(json.getString("id"))).delete(); throw error }
     }
     fun acknowledge(id: String) { commit(entries.map { if (it.id == id) it.copy(pending = false) else it }) }
+    fun remove(ids: Set<String>) {
+        val removed = entries.filter { it.id in ids }
+        if (removed.isEmpty()) return
+        commit(entries.filterNot { it.id in ids })
+        removed.filter { it.kind == "file" }.forEach { AtomicFile(file(it.id)).delete() }
+    }
+    fun applyDeletions(response: JSONArray, requested: Set<String>): Set<String> {
+        require(response.length() <= requested.size) { "Invalid deletion response." }
+        val ids = mutableSetOf<String>()
+        for (i in 0 until response.length()) {
+            val id = response.getString(i).lowercase()
+            require(id in requested && ids.add(id)) { "Invalid deletion response." }
+        }
+        remove(ids)
+        return ids
+    }
     /** Validate peer metadata before either upload acknowledgements or downloads mutate storage. */
     fun validateSnapshot(remote: JSONArray): List<ShelfEntry> {
         require(remote.length() <= MAX_SHELF_ITEMS) { "The shelf can hold up to 500 items." }

@@ -56,6 +56,7 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
     var filter by rememberSaveable { mutableStateOf("All") }
     var attachments by rememberSaveable { mutableStateOf(false) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var deleteId by rememberSaveable { mutableStateOf<String?>(null) }
     val searchFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -179,7 +180,15 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
         if (attachments) AttachmentSheet(
             onFiles = { attachments = false; onFiles() }, onCamera = { attachments = false; onCamera() }, onDismiss = { attachments = false })
         state.entries.firstOrNull { it.id == selectedId }?.let { entry ->
-            ItemDetailsSheet(entry, onCopy = onCopy, onOpen = onOpen, onDismiss = { selectedId = null })
+            ItemDetailsSheet(entry, onCopy = onCopy, onOpen = onOpen, onDismiss = { selectedId = null },
+                canDelete = state.canDelete, busy = state.busy, onDelete = { deleteId = entry.id })
+        }
+        state.entries.firstOrNull { it.id == deleteId }?.let { entry ->
+            AlertDialog(onDismissRequest = { deleteId = null }, title = { Text("Delete from the shared shelf?") },
+                text = { Text("“${entry.title}” will be removed from this phone and ${state.peerName}. Both apps must be online. Copies saved outside Hoppair are kept.",
+                    modifier = Modifier.verticalScroll(rememberScrollState())) },
+                confirmButton = { TextButton(onClick = { deleteId = null; model.deleteEntry(entry.id) { selectedId = null } }, enabled = !state.busy) { Text("Delete") } },
+                dismissButton = { TextButton(onClick = { deleteId = null }) { Text("Cancel") } })
         }
         state.replacement?.let { replacement ->
             AlertDialog(onDismissRequest = model::cancelPairingReplacement,

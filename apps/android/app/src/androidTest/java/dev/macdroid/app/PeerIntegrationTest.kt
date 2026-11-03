@@ -36,6 +36,12 @@ class PeerIntegrationTest {
         client.call("put", file, payload)
         client.call("put", file, byteArrayOf(1, 2, 3)) // Lost-ack retry must not overwrite the original.
         assertArrayEquals(payload, Base64.decode(client.call("get", id = file.getString("id")).getString("data"), Base64.DEFAULT))
+        val discarded = JSONObject(file.toString()).put("id", UUID.randomUUID().toString()).put("title", "Delete fixture")
+        client.call("put", discarded, byteArrayOf(1, 2, 3))
+        client.call("delete", id = discarded.getString("id"))
+        client.call("delete", id = discarded.getString("id"))
+        assertEquals(discarded.getString("id"), client.call("deleted", ids = listOf(discarded.getString("id"))).getJSONArray("deleted").getString(0))
+        assertThrows(PeerRejected::class.java) { client.call("put", discarded, byteArrayOf(1, 2, 3)) }
         val text = JSONObject().put("id", UUID.randomUUID().toString()).put("kind", "text").put("title", "peer-complete")
             .put("text", "Android → Swift · success").put("size", 0).put("createdAt", System.currentTimeMillis() / 1000.0).put("source", "Android").put("pinned", false)
         client.call("put", text)

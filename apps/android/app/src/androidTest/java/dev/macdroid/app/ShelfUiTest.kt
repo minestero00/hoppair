@@ -180,6 +180,16 @@ class ShelfUiTest {
             waitDisplay(scenario, 1f, 320, Configuration.ORIENTATION_PORTRAIT)
             waitText("Your shelf")
             screenshot(screenshots, "shelf-tablet")
+            tapText("A few things for tomorrow")
+            compose.onNodeWithText("Delete from shared shelf").performScrollTo().performClick()
+            waitText("Delete from the shared shelf?")
+            screenshot(screenshots, "delete-confirmation")
+            tapText("Cancel")
+            waitText("A few things", contains = true)
+            compose.onNodeWithText("Delete from shared shelf").performScrollTo().performClick()
+            compose.onNodeWithText("Delete", substring = false).performClick()
+            compose.waitUntil(15_000) { compose.onAllNodesWithText("A few things for tomorrow", substring = true).fetchSemanticsNodes().isEmpty() }
+
             scenario.close()
             scenario = null
             PairingVault(context).clear()

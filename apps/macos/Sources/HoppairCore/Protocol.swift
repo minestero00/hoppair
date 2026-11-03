@@ -34,6 +34,7 @@ public struct BridgeRequest: Codable, Sendable {
     public var item: ShelfItem?
     public var data: String?
     public var id: String?
+    public var ids: [String]?
     public init(action: String, item: ShelfItem? = nil, data: String? = nil, id: String? = nil) {
         self.action = action; self.item = item; self.data = data; self.id = id
     }
@@ -48,6 +49,8 @@ public struct BridgeResponse: Codable, Sendable {
     public var nextCursor: String?
     public var deviceName: String?
     public var syncAcknowledgement: Bool?
+    public var supportsDeletion: Bool?
+    public var deleted: [String]?
     public init(ok: Bool = true, error: String? = nil, items: [ShelfItem]? = nil,
                 data: String? = nil, cameraRequest: String? = nil, nextCursor: String? = nil) {
         self.ok = ok; self.error = error; self.items = items; self.data = data; self.cameraRequest = cameraRequest; self.nextCursor = nextCursor

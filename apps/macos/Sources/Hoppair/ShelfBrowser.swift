@@ -6,6 +6,7 @@ struct ShelfBrowser: View {
     let items: [ShelfItem]
     @State private var selectedID: String?
     @State private var detail: ShelfItem?
+    @State private var pendingDeletion: ShelfItem?
     @State private var copiedID: String?
     @FocusState private var listFocused: Bool
     private var selected: ShelfItem? { items.first(where: { $0.id == selectedID }) ?? items.first }
@@ -18,7 +19,7 @@ struct ShelfBrowser: View {
                         ForEach(items) { item in
                             ShelfItemRow(item: item, url: model.previewURL(for: item), selected: item.id == selected?.id, focused: listFocused && item.id == selected?.id, copied: copiedID == item.id,
                                 onSelect: { selectedID = item.id; listFocused = true; if !hasPreview { detail = item } },
-                                onAction: { perform(item) }, onPin: { model.pin(item) }, onDetails: { detail = item })
+                                onAction: { perform(item) }, onPin: { model.pin(item) }, onDetails: { detail = item }, onDelete: { requestDelete(item) })
                                 .id(item.id)
                                 .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                                 .listRowSeparator(.hidden).listRowBackground(Color.clear)
@@ -36,7 +37,7 @@ struct ShelfBrowser: View {
                 if hasPreview, let selected {
                     Divider()
                     ShelfItemPreview(item: selected, url: model.previewURL(for: selected), copied: copiedID == selected.id, expanded: false,
-                        onAction: { perform(selected) }, onPin: { model.pin(selected) }, onExpand: { detail = selected })
+                        onAction: { perform(selected) }, onPin: { model.pin(selected) }, onExpand: { detail = selected }, onDelete: { requestDelete(selected) })
                         .frame(width: min(310, geometry.size.width * 0.45)).id(selected.id)
                 }
             }
@@ -47,20 +48,33 @@ struct ShelfBrowser: View {
         .onAppear {
             selectedID = (model.isScreenshotMode ? items.first(where: { $0.mime?.hasPrefix("image/") == true }) : nil)?.id ?? items.first?.id
         }
-        .onChange(of: items.map(\.id)) { _, ids in if let selectedID, !ids.contains(selectedID) { self.selectedID = ids.first } }
+        .onChange(of: items.map(\.id)) { _, ids in
+            if let selectedID, !ids.contains(selectedID) { self.selectedID = ids.first }
+            if let detail, !ids.contains(detail.id) { self.detail = nil }
+        }
         .task(id: copiedID) {
             guard copiedID != nil else { return }
             do { try await Task.sleep(for: .seconds(2)); copiedID = nil } catch { }
         }
-        .sheet(item: $detail) { item in
+        .sheet(item: $detail, onDismiss: {
+            guard let item = pendingDeletion else { return }
+            pendingDeletion = nil
+            if model.items.contains(where: { $0.id == item.id }) { model.itemToDelete = item }
+        }) { item in
             let item = model.items.first(where: { $0.id == item.id }) ?? item
             VStack(spacing: 0) {
                 HStack { Text("Item Preview").font(.headline); Spacer(); Button("Done") { detail = nil }.hoppairButton().keyboardShortcut(.cancelAction) }.padding(20)
                 Divider()
                 ShelfItemPreview(item: item, url: model.previewURL(for: item), copied: copiedID == item.id, expanded: true,
-                    onAction: { perform(item) }, onPin: { model.pin(item) }, onExpand: nil)
+                    onAction: { perform(item) }, onPin: { model.pin(item) }, onExpand: nil, onDelete: { requestDelete(item) })
             }.frame(width: 560, height: 540)
         }
+    }
+    private func requestDelete(_ item: ShelfItem) {
+        if detail != nil {
+            pendingDeletion = item
+            detail = nil
+        } else { model.itemToDelete = item }
     }
     private func perform(_ item: ShelfItem) {
         if item.kind == "text", let text = item.text { if model.copy(text) { copiedID = item.id } }

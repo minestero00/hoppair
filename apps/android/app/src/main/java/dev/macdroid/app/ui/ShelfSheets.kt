@@ -107,7 +107,8 @@ private fun AttachmentAction(icon: ImageVector, title: String, subtitle: String,
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit, onDismiss: () -> Unit) {
+internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit, onDismiss: () -> Unit,
+    canDelete: Boolean = false, busy: Boolean = false, onDelete: () -> Unit = {}) {
     var copied by remember(entry.id) { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
@@ -138,6 +139,13 @@ internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpe
                     Spacer(Modifier.width(8.dp)); Text(if (copied) "Copied" else "Copy")
                 }
             }
+            HorizontalDivider()
+            TextButton(onClick = onDelete, enabled = canDelete && !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                Icon(Icons.Outlined.DeleteOutline, null); Spacer(Modifier.width(8.dp)); Text("Delete from shared shelf")
+            }
+            if (!canDelete) Text("Connect to an updated Mac app to delete shared items.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

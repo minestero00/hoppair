@@ -16,12 +16,14 @@ The optional WSS relay carries one sealed payload per binary message, without th
 | `list` | Small legacy shelf snapshot; large shelves require an app update |
 | `put` | Add an item with optional base64 file data |
 | `get` | Fetch one file by ID |
+| `delete` | Delete an item and persist an anti-retry receipt |
+| `deleted` | Query receipts for up to 1,000 known item IDs |
 | `cameraAck` | Acknowledge a photo request |
 | `syncAck` | Confirm a round trip and exchange device names |
 
 The Mac writes file data and an atomic index before acknowledging `put`. Stable item UUIDs make retries idempotent. Android marks an outbox item delivered only after success. Received files and links are never opened automatically. Missing or truncated received files are fetched again without blocking unrelated notes. Repairs retain the saved item’s type and declared size; queued local files are never replaced by downloads. A repaired indexed file remains usable even if a later item aborts the snapshot, while new unindexed downloads are cleaned up.
 
-Limits: 8 MiB per file, 64 KiB per text item, 12 MiB per encrypted frame, 500 shelf items. A full shelf rejects new items without removing old ones.
+Limits: 8 MiB per file, 64 KiB per text item, 12 MiB per encrypted frame, 500 shelf items. A full shelf rejects new items without removing old ones. Users can explicitly delete items to free space. The Mac advertises `supportsDeletion`; older clients must update to reconcile removals. SQLite deletion receipts commit before index compaction and payload cleanup, so delayed uploads cannot restore removed items. Android validates queried receipts before uploading its outbox, then drops matching local and stale snapshot entries. Cleanup retries survive restarts without deleting unrelated files.
 
 Metadata pages contain at most 100 items and approximately 2 MiB of encoded JSON. `listPage.id` is the previous page's last item UUID; `nextCursor` repeats the new last UUID when another page remains. Android validates the complete snapshot, IDs, cursors, and metadata before applying it. JSON expansion cannot turn a valid large shelf into a single oversized frame. Large initial relay syncs remain subject to the [relay throughput limits](relay.md#security-and-operation).
 

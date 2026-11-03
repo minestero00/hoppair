@@ -29,6 +29,7 @@ struct ShelfItemRow: View {
     let onAction: () -> Void
     let onPin: () -> Void
     let onDetails: () -> Void
+    let onDelete: () -> Void
     @State private var hovered = false
     var body: some View {
         HStack(spacing: 6) {
@@ -69,6 +70,8 @@ struct ShelfItemRow: View {
             Button("Open Preview", action: onDetails)
             Divider()
             Button(item.pinned ? "Unpin Item" : "Pin Item", action: onPin)
+            Divider()
+            Button("Delete…", role: .destructive, action: onDelete)
         }
     }
 }
@@ -81,11 +84,14 @@ struct ShelfItemPreview: View {
     let onAction: () -> Void
     let onPin: () -> Void
     let onExpand: (() -> Void)?
+    let onDelete: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("PREVIEW").font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(HoppairPalette.secondaryText)
                 Spacer()
+                Button(action: onDelete) { Image(systemName: "trash").frame(width: 15, height: 15) }
+                    .hoppairButton(.icon).help("Delete from shared shelf").accessibilityLabel("Delete from shared shelf")
                 Button(action: onPin) { Image(systemName: item.pinned ? "pin.fill" : "pin").frame(width: 15, height: 15) }
                     .hoppairButton(.icon).help(item.pinned ? "Unpin item" : "Pin item")
                     .accessibilityLabel(item.pinned ? "Unpin item" : "Pin item")

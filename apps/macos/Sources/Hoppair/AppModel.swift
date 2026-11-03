@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
     @Published var items: [ShelfItem] = []
     @Published var message = "Preparing your connection"
     @Published var error: String?
+    @Published var itemToDelete: ShelfItem?
     @Published var port: UInt16 = 0
     @Published var deviceName = UserDefaults.standard.string(forKey: "deviceName") ?? ""
     @Published var peerName = UserDefaults.standard.string(forKey: "peerName") ?? "Android phone"
@@ -160,7 +161,18 @@ final class AppModel: ObservableObject {
                 var response = BridgeResponse(items: page.items, cameraRequest: cameraRequest, nextCursor: page.nextCursor)
                 response.deviceName = localDeviceName
                 response.syncAcknowledgement = true
+                response.supportsDeletion = true
                 return response
+            case "deleted":
+                guard let ids = request.ids else { throw BridgeError.invalid("Item IDs are missing.") }
+                var response = BridgeResponse()
+                response.deleted = try store.deletedIDs(in: ids)
+                return response
+            case "delete":
+                guard let id = request.id else { throw BridgeError.invalid("Item ID is missing.") }
+                try store.delete(id); refresh()
+                message = "Deleted from the shared shelf"
+                return BridgeResponse()
             case "syncAck":
                 if let name = request.deviceName {
                     let clean = Self.cleanName(name)
@@ -201,6 +213,14 @@ final class AppModel: ObservableObject {
         perform {
             try store?.put(ShelfItem(kind: link ? "link" : "text", title: String(value.prefix(90)), text: value))
             message = "Added to the shelf · your phone will receive it when connected"
+        }
+    }
+    func deleteItem(_ item: ShelfItem) {
+        if isScreenshotMode { items.removeAll { $0.id == item.id }; return }
+        perform {
+            guard let store else { throw BridgeError.invalid("Could not open local storage.") }
+            try store.delete(item.id)
+            message = "Deleted · your phone will update when it reconnects"
         }
     }
     func paste() { if let text = NSPasteboard.general.string(forType: .string) { addText(text) } }

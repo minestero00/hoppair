@@ -24,7 +24,7 @@ internal data class ShelfState(
     val online: Boolean = false, val status: String = "Connect your Mac to get started",
     val error: String? = null, val busy: Boolean = false, val cameraRequest: String? = null,
     val host: String = "", val peerName: String = "Mac", val deviceName: String = "", val defaultDeviceName: String = "Android phone",
-    val replacement: PairingReplacement? = null
+    val replacement: PairingReplacement? = null, val canDelete: Boolean = false
 )
 
 internal class ShelfViewModel(application: Application) : AndroidViewModel(application) {
@@ -169,7 +169,7 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
             val name = cleanDeviceName(response.optString("deviceName", "Mac")).ifBlank { "Mac" }
             preferences.edit().putString("peer", name).apply()
             state.update { it.copy(paired = true, online = false, host = candidate.host, peerName = name, cameraRequest = null,
-                error = null, status = "Loading your shelf…") }
+                error = null, canDelete = response.optBoolean("supportsDeletion", false), status = "Loading your shelf…") }
             true
         }
     }
@@ -182,6 +182,21 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
         for (uri in uris) repository!!.addFile(uri)
         state.update { it.copy(status = "Queued for transfer") }
     }
+    fun deleteEntry(id: String, onSuccess: () -> Unit = {}) = operation(onSuccess) {
+        check(state.value.canDelete) { "Update Hoppair on your Mac and reconnect to delete shared items." }
+        val client = connection(checkNotNull(pairing) { "Connect your Mac to delete shared items." })
+        val context = currentCoroutineContext()
+        client.setCancellationCheck { context.ensureActive() }
+        try {
+            client.call("delete", id = id)
+            repository!!.remove(setOf(id))
+            state.update { it.copy(status = "Deleted from the shared shelf") }
+        } catch (error: Exception) {
+            closeConnection()
+            state.update { it.copy(online = false, status = friendly(error)) }
+            throw error
+        } finally { syncClient?.setCancellationCheck {} }
+    }
     suspend fun sync() {
         mutex.withLock {
             withContext(Dispatchers.IO) {
@@ -193,12 +208,17 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
                     client.setCancellationCheck { syncContext.ensureActive() }
                     val response = client.call("list")
                     val incoming = repo.validateSnapshot(response.getJSONArray("items"))
+                    val supportsDeletion = response.optBoolean("supportsDeletion", false)
+                    val requested = (repo.entries.map { it.id } + incoming.map { it.id }).toSet()
+                    val deleted = if (supportsDeletion && requested.isNotEmpty())
+                        repo.applyDeletions(client.call("deleted", ids = requested.toList()).getJSONArray("deleted"), requested)
+                        else emptySet()
                     val queuedAtSnapshot = repo.entries.filter { it.pending }.map { it.id }.toSet()
                     // Send local changes before downloads so one unavailable remote file cannot starve them.
                     val uploads = repo.uploadPending { entry, bytes -> client.call("put", entry.json, bytes) }
                     // The snapshot predates these acknowledgements; do not replace just-sent
                     // content with its older peer copy during this pass.
-                    val received = repo.merge(incoming.filterNot { it.id in queuedAtSnapshot }, client)
+                    val received = repo.merge(incoming.filterNot { it.id in queuedAtSnapshot || it.id in deleted }, client)
                     state.update { it.copy(entries = repo.entries) }
                     received.interruption?.let { throw it }
                     val unavailableFiles = received.unavailableFiles
@@ -216,7 +236,7 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
                         else if (unavailableFiles > 0)
                         "$unavailableFiles ${if (unavailableFiles == 1) "file is" else "files are"} waiting to download. Other items can still sync. Retrying automatically."
                         else "Everything is up to date"
-                    state.update { it.copy(entries = repo.entries, online = true, peerName = peerName, status = rejected ?: transferStatus, cameraRequest = camera) }
+                    state.update { it.copy(entries = repo.entries, online = true, peerName = peerName, canDelete = supportsDeletion, status = rejected ?: transferStatus, cameraRequest = camera) }
                 } catch (error: Exception) {
                     closeConnection()
                     if (error is CancellationException) throw error

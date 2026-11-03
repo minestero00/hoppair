@@ -106,8 +106,8 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
     fun setCancellationCheck(check: () -> Unit = {}) { cancellationCheck = check }
     private var localFailed = false
     private var relay: RelaySocket? = null
-    @Synchronized fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null): JSONObject =
-        if (action == "list") listPages() else callSingle(action, item, data, id, deviceName)
+    @Synchronized fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null, ids: List<String>? = null): JSONObject =
+        if (action == "list") listPages() else callSingle(action, item, data, id, deviceName, ids)
     private fun listPages(): JSONObject {
         val items = JSONArray()
         val seenItems = mutableSetOf<String>()
@@ -138,7 +138,7 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
         } while (cursor != null)
         return checkNotNull(first).put("items", items).also { it.remove("nextCursor") }
     }
-    private fun callSingle(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null): JSONObject {
+    private fun callSingle(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null, deviceName: String? = null, ids: List<String>? = null): JSONObject {
         cancellationCheck()
         require(data == null || data.size <= MAX_FILE) { "Files must be 8 MiB or smaller." }
         val request = JSONObject().put("version", 1).put("requestId", UUID.randomUUID().toString())
@@ -147,6 +147,10 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
         data?.let { request.put("data", Base64.encodeToString(it, Base64.NO_WRAP)) }
         id?.let { request.put("id", it) }
         deviceName?.let { request.put("deviceName", it) }
+        ids?.let {
+            require(it.size <= 1000 && it.all { value -> UUID.fromString(value).toString().equals(value, ignoreCase = true) }) { "Invalid deletion query." }
+            request.put("ids", JSONArray(it))
+        }
         val encrypted = PayloadCrypto.seal(request.toString().toByteArray(Charsets.UTF_8), pairing.key)
         require(encrypted.size <= MAX_FRAME) { "Transfer exceeds the size limit." }
         if (!localFailed) {
