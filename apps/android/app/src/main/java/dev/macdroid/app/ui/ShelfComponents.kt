@@ -68,8 +68,8 @@ internal fun ConnectionCard(state: ShelfState, onClick: () -> Unit) {
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(if (state.online) "Mac connected" else "Waiting for Mac", style = MaterialTheme.typography.titleMedium)
-                Text(if (state.online) state.status else if (pending > 0) "$pending waiting · reconnecting automatically" else "Reconnecting automatically",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(if (!state.online && pending > 0) "$pending waiting · ${state.status}" else state.status,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             Icon(if (state.online) Icons.Outlined.CheckCircle else Icons.Outlined.CloudOff, null,
                 tint = if (state.online) ShelfColors.success() else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))

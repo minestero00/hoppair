@@ -76,14 +76,7 @@ public final class ShelfStore {
         guard items.contains(where: { $0.id == id && $0.kind == "file" }) else {
             throw BridgeError.invalid("File not found.")
         }
-        let file = try FileHandle(forReadingFrom: fileURL(id))
-        defer { try? file.close() }
-        var content = Data()
-        while let chunk = try file.read(upToCount: min(64 * 1024, Wire.maxFileSize + 1 - content.count)), !chunk.isEmpty {
-            content.append(chunk)
-            guard content.count <= Wire.maxFileSize else { throw BridgeError.invalid("Files must be 8 MiB or smaller.") }
-        }
-        return content
+        return try FilePayload.read(fileURL(id))
     }
     public func put(_ input: ShelfItem, content: Data? = nil) throws {
         guard UUID(uuidString: input.id) != nil else { throw BridgeError.invalid("Invalid item ID.") }

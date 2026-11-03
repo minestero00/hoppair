@@ -21,7 +21,9 @@ trap 'rm -f "$TEMP_OUTPUT"; rm -rf "$WORK_DIR"' EXIT
 mkdir -p "$(dirname "$OUTPUT")"
 ditto "$SOURCE" "$STAGED"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier dev.hoppair.screenshots' "$STAGED/Contents/Info.plist"
-codesign --force --sign - "$STAGED"
+# The isolated, ad-hoc preview has no Team ID. Clear inherited hardened-runtime
+# flags so its Developer ID-signed dependency can load; production is untouched.
+codesign --force --options 0x0 --sign - "$STAGED"
 codesign --verify --deep --strict "$STAGED"
 python3 - "$STAGED" "$PREVIEW" "$WORK_DIR/previous.app" <<'PYCODE'
 import os,subprocess,sys

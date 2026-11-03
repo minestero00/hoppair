@@ -5,6 +5,7 @@ import CryptoKit
 import UniformTypeIdentifiers
 import HoppairCore
 import Darwin
+import Network
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -22,6 +23,9 @@ final class AppModel: ObservableObject {
     private var server: BridgeServer?
     private var relayHost: RelayHost?
     private let requestGuard = RequestReplayGuard()
+    private let networkMonitor = NWPathMonitor()
+    private var fileImportTask: Task<Void, Never>?
+    @Published private(set) var pendingImports = 0
     @Published var relayAddress = UserDefaults.standard.string(forKey: "relayAddress") ?? (Bundle.main.object(forInfoDictionaryKey: "HoppairRelayURL") as? String ?? Bundle.main.object(forInfoDictionaryKey: "MacDroidRelayURL") as? String ?? "")
     @Published var relayConnected = false
     private var key = Data()
@@ -53,6 +57,10 @@ final class AppModel: ObservableObject {
             return
         }
         selectedAddress = addresses.first ?? ""
+        networkMonitor.pathUpdateHandler = { [weak self] _ in
+            Task { @MainActor [weak self] in self?.refreshNetwork() }
+        }
+        networkMonitor.start(queue: DispatchQueue(label: "dev.hoppair.network-path"))
         do {
             // Keep the original storage and Keychain identities for in-place upgrades.
             let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
@@ -71,7 +79,7 @@ final class AppModel: ObservableObject {
             server.onState = { [weak self] state in self?.message = state }
             server.onPort = { [weak self] port in self?.port = port }
             try server.start()
-            if !relayAddress.isEmpty { configureRelay() }
+            if !relayAddress.isEmpty, let issue = configureRelay() { self.error = issue }
             preparing = false
         } catch { preparing = false; self.error = "Could not prepare the connection: \(error.localizedDescription)" }
     }
@@ -97,10 +105,12 @@ final class AppModel: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showCommands = true }
         } else { showCommands = true }
     }
-    func configureRelay(_ input: String? = nil) {
-        guard !isScreenshotMode else { return }
-        let address = (input ?? relayAddress).trimmingCharacters(in: .whitespacesAndNewlines)
-        if address.isEmpty { relayHost?.stop(); relayHost = nil; relayAddress = ""; UserDefaults.standard.removeObject(forKey: "relayAddress"); return }
+    @discardableResult func configureRelay(_ input: String? = nil) -> String? {
+        guard !isScreenshotMode else { return nil }
+        var address = (input ?? relayAddress).trimmingCharacters(in: .whitespacesAndNewlines)
+        // Worker dashboards copy HTTPS origins; use the equivalent secure WebSocket origin.
+        if address.hasPrefix("https://") { address = "wss://" + address.dropFirst(8) }
+        if address.isEmpty { relayHost?.stop(); relayHost = nil; relayConnected = false; relayAddress = ""; UserDefaults.standard.removeObject(forKey: "relayAddress"); return nil }
         do {
             _ = try RelayIdentity.endpoint(base: address, key: key, role: "host")
             relayHost?.stop(); relayHost = nil
@@ -108,7 +118,8 @@ final class AppModel: ObservableObject {
             host.onState = { [weak self] connected in self?.relayConnected = connected }
             relayHost = host; try host.start()
             relayAddress = address; UserDefaults.standard.set(address, forKey: "relayAddress")
-        } catch { self.error = error.localizedDescription }
+            return nil
+        } catch { return error.localizedDescription }
     }
     func refreshNetwork() {
         guard !isScreenshotMode else { return }
@@ -164,16 +175,29 @@ final class AppModel: ObservableObject {
         if panel.runModal() == .OK { panel.urls.forEach(importFile) }
     }
     func importFile(_ url: URL) {
-        perform {
-            let granted = url.startAccessingSecurityScopedResource()
-            defer { if granted { url.stopAccessingSecurityScopedResource() } }
-            let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
-            guard size <= Wire.maxFileSize else { throw BridgeError.invalid("\(url.lastPathComponent): Files must be 8 MiB or smaller.") }
-            let data = try Data(contentsOf: url)
-            try store?.put(ShelfItem(kind: "file", title: url.lastPathComponent, filename: url.lastPathComponent,
-                                    mime: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType, size: data.count), content: data)
-            message = "File added to the shelf"
+        let previous = fileImportTask
+        pendingImports += 1
+        fileImportTask = Task {
+            await previous?.value
+            defer { pendingImports -= 1 }
+            do {
+                guard store != nil else { throw BridgeError.invalid("Could not open local storage. Please restart the app.") }
+                message = "Adding \(url.lastPathComponent)…"
+                let data = try await Task.detached(priority: .userInitiated) {
+                    let granted = url.startAccessingSecurityScopedResource()
+                    defer { if granted { url.stopAccessingSecurityScopedResource() } }
+                    return try FilePayload.read(url)
+                }.value
+                perform {
+                    try store?.put(ShelfItem(kind: "file", title: url.lastPathComponent, filename: url.lastPathComponent,
+                                            mime: UTType(filenameExtension: url.pathExtension)?.preferredMIMEType, size: data.count), content: data)
+                    message = "File added to the shelf"
+                }
+            } catch { self.error = "\(url.lastPathComponent): \(error.localizedDescription)" }
         }
+    }
+    func finishPendingImports() async {
+        while pendingImports > 0 { await fileImportTask?.value }
     }
     func previewURL(for item: ShelfItem) -> URL? {
         guard item.kind == "file" else { return nil }
@@ -231,7 +255,9 @@ final class AppModel: ObservableObject {
         while let entry = current {
             defer { current = entry.pointee.ifa_next }
             guard let address = entry.pointee.ifa_addr, address.pointee.sa_family == UInt8(AF_INET),
-                  entry.pointee.ifa_flags & UInt32(IFF_LOOPBACK) == 0 else { continue }
+                  entry.pointee.ifa_flags & UInt32(IFF_LOOPBACK) == 0,
+                  entry.pointee.ifa_flags & UInt32(IFF_UP) != 0,
+                  entry.pointee.ifa_flags & UInt32(IFF_RUNNING) != 0 else { continue }
             var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
             if getnameinfo(address, socklen_t(address.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
                 result.append(String(cString: host))
@@ -242,4 +268,5 @@ final class AppModel: ObservableObject {
             return rank(a) == rank(b) ? a < b : rank(a) < rank(b)
         }
     }
+    deinit { networkMonitor.cancel() }
 }

@@ -59,6 +59,8 @@ private struct ShelfWindow: View {
             .onAppear {
             delegate.onOpenShelf = { openWindow(id: "shelf") }
             delegate.onHotKey = { model.openCommands(); delegate.reveal() }
+            delegate.hasPendingImports = { model.pendingImports > 0 }
+            delegate.finishPendingImports = { await model.finishPendingImports() }
             delegate.configureWindowChrome()
             if model.isScreenshotMode { delegate.captureSampleView() }
         }
@@ -68,6 +70,8 @@ private struct ShelfWindow: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     var onHotKey: (() -> Void)?
     var onOpenShelf: (() -> Void)?
+    var hasPendingImports: (() -> Bool)?
+    var finishPendingImports: (() async -> Void)?
     private var hotKey: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var sampleCaptured = false
@@ -90,6 +94,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if status != noErr { NSLog("Hoppair global shortcut unavailable (status %d).", status) }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard hasPendingImports?() == true, let finishPendingImports else { return .terminateNow }
+        Task { @MainActor in
+            await finishPendingImports()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { reveal(); return true }
     func reveal() {
         NSApplication.shared.activate(ignoringOtherApps: true)

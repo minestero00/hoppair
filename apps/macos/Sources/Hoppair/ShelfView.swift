@@ -91,7 +91,12 @@ struct ShelfView: View {
                         Button("Add", systemImage: "arrow.up") { sendDraft() }
                             .hoppairButton(.primary).disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    HStack { Text(model.message).lineLimit(2); Spacer(); Text("Up to 8 MiB per file") }.font(.caption).foregroundStyle(HoppairPalette.secondaryText)
+                    HStack {
+                        if model.pendingImports > 0 { ProgressView().controlSize(.small).accessibilityLabel("Adding files") }
+                        Text(model.message).lineLimit(2)
+                        Spacer()
+                        Text("Up to 8 MiB per file")
+                    }.font(.caption).foregroundStyle(HoppairPalette.secondaryText)
                 }.padding(.horizontal, 24).padding(.vertical, 18).background(.regularMaterial)
             }
             .background(HoppairCanvas())

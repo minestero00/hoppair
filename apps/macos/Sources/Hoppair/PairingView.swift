@@ -6,6 +6,8 @@ struct PairingView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var advanced = false
     @State private var relayDraft = ""
+    @State private var relayError: String?
+    @State private var relayApplied = false
     private let maximumHeight: CGFloat?
 
     init(initiallyExpanded: Bool = false, maximumHeight: CGFloat? = nil) {
@@ -116,12 +118,27 @@ struct PairingView: View {
                     Text("Relay address").font(.caption.weight(.semibold))
                     TextField("wss://…", text: $relayDraft).textFieldStyle(.roundedBorder)
                         .accessibilityLabel("Relay address")
+                        .accessibilityHint(relayError ?? "")
+                        .onSubmit(applyRelay)
+                        .onChange(of: relayDraft) { _, value in
+                            relayError = nil
+                            if value != model.relayAddress { relayApplied = false }
+                        }
+                    if let relayError {
+                        Label(relayError, systemImage: "exclamationmark.circle")
+                            .font(.caption).foregroundStyle(HoppairPalette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if relayApplied {
+                        Text("Settings applied. Scan the updated QR to refresh your phone’s connection.")
+                            .font(.caption).foregroundStyle(HoppairPalette.secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                     HStack {
                         Text(model.relayRoom.isEmpty ? "Device ID unavailable" : "Device ID: " + model.relayRoom)
                             .font(.caption).foregroundStyle(HoppairPalette.secondaryText).textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 8)
-                        Button("Apply") { model.configureRelay(relayDraft) }
+                        Button("Apply", action: applyRelay)
                             .hoppairButton(.secondary).disabled(model.preparing)
                     }
                     if !model.relayAddress.isEmpty && !model.relayConnected {
@@ -145,6 +162,13 @@ struct PairingView: View {
                 }
             }.padding(.top, 16)
         }.font(.callout)
+    }
+
+    private func applyRelay() {
+        guard !model.preparing else { return }
+        relayError = model.configureRelay(relayDraft)
+        relayApplied = relayError == nil
+        if relayApplied { relayDraft = model.relayAddress }
     }
 
     private var qrImage: NSImage? {

@@ -17,7 +17,7 @@ cd ../..
 ./scripts/deploy-relay.sh /absolute/path/to/registration.json
 ```
 
-3. Change the deployed address from `https://…workers.dev` to `wss://…workers.dev`. Enter it under the Mac's **Relay Settings**, then choose **Apply**.
+3. Paste the deployed origin under the Mac's **Relay address**, then choose **Apply**. HTTPS origins are converted to secure `wss://` addresses automatically; omit paths such as `/health`.
 4. Once connected, scan the updated QR on Android. Subsequent network changes reuse the same pairing.
 
 Use the deployment script with the same registration file for updates. A plain deployment uses an empty registration map and rejects devices.

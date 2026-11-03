@@ -24,7 +24,7 @@ public enum RelayIdentity {
               components.port.map({ (1...65535).contains($0) }) ?? true,
               components.user == nil, components.password == nil,
               components.scheme == "wss" || (components.scheme == "ws" && ["127.0.0.1", "localhost"].contains(host)) else {
-            throw BridgeError.invalid("Relay addresses must start with wss://.")
+            throw BridgeError.invalid("Use wss://host with an optional port. Remove any path, query, fragment, or sign-in details.")
         }
         components.path = "/room/" + room(key: key)
         components.queryItems = [URLQueryItem(name: "role", value: role)]

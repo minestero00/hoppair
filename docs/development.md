@@ -14,6 +14,15 @@ swift test --package-path apps/macos
 
 The Swift suite covers ping callback races, cancellation/timeouts, and real loopback WebSocket disconnect/reconnect and heartbeat checks.
 
+For real Sparkle engine installation, cancellation and tamper-rejection checks, run the isolated updater gate with your existing signing identity:
+
+```bash
+python3 scripts/test-mac-updater.py \
+  --identity "Developer ID Application: Your Name (TEAMID)"
+```
+
+It uses the pinned framework from `dist/Hoppair.app` and the existing Sparkle Keychain account. Disposable apps have unique test bundle IDs and a loopback feed; they never use the personal shelf, pairing key or production feed. The gate checks actual replacement/relaunch, signature rejection, cancellation and download cleanup. Its custom headless user driver does not test the standard updater window; its canary is fixture data, not a production shelf migration test.
+
 Quit Hoppair before rebuilding; the script refuses to replace a running app. Local builds use ad-hoc signing. Set `HOPPAIR_SIGN_IDENTITY` to use your own signing identity. Rebuilt development apps may require renewed Keychain approval.
 
 ## Android
@@ -63,7 +72,7 @@ After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately i
 ## Package a release
 
 ```bash
-./scripts/package-release.sh 0.1.6
+./scripts/package-release.sh 0.1.7
 ```
 
 Existing MacDroid signing configurations are reused automatically; do not generate a replacement key for an existing installation. `MACDROID_*` signing/build environment variables remain accepted as fallbacks.
@@ -71,6 +80,8 @@ Existing MacDroid signing configurations are reused automatically; do not genera
 Create your own persistent Android signing key once with `python3 scripts/create-android-signing.py`. It is stored under `~/.config/hoppair/signing/`, outside Git; back up both files. Use `HOPPAIR_ANDROID_SIGNING_FILE` to select another configuration. Local debug APKs and signed release APKs use different keys and cannot update one another.
 
 The packaging command builds both apps and writes a Mac ZIP, signed Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files after the relevant local gates pass. Public Mac downloads should use Developer ID signing and notarization; never upload signing keys or local configuration.
+
+The requested version must match both app builds; mismatches fail before archives can receive incorrect filenames. For a platform-only release, package the changed app separately and use the [feed preparation command](updates.md#release-order) with the unchanged other binary.
 
 For notarized Mac releases, use your own **Developer ID Application** identity. With Xcode's signed-in account:
 
@@ -86,7 +97,7 @@ For command-line packaging, use an existing `notarytool` Keychain profile:
 ```bash
 HOPPAIR_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 HOPPAIR_NOTARY_PROFILE=hoppair-notary \
-./scripts/package-release.sh 0.1.6
+./scripts/package-release.sh 0.1.7
 ```
 
 Create the profile yourself with `xcrun notarytool store-credentials hoppair-notary`; credentials stay outside Git. The packaging script enables hardened runtime, waits for notarization, staples the ticket, and then archives the app.
