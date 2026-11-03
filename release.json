@@ -1,21 +1,21 @@
 {
-  "version": "0.1.8",
-  "message": "v0.1.8 is available.",
+  "version": "0.1.9",
+  "message": "v0.1.9 is available.",
   "mac": {
-    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.8/Hoppair-0.1.8-macos-arm64.zip",
+    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.9/Hoppair-0.1.9-macos-arm64.zip",
     "label": "Download for Mac",
-    "note": "v0.1.8 \u00b7 Developer ID signed \u00b7 Apple notarized \u00b7 3.0 MiB",
-    "version": "0.1.8",
-    "build": 18
+    "note": "v0.1.9 \u00b7 Developer ID signed \u00b7 Apple notarized \u00b7 3.0 MiB",
+    "version": "0.1.9",
+    "build": 19
   },
   "android": {
-    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.8/Hoppair-0.1.8-android.apk",
+    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.9/Hoppair-0.1.9-android.apk",
     "label": "Download APK",
-    "note": "Android 9+ \u00b7 signed release \u00b7 43.7 MiB",
-    "versionName": "0.1.8",
-    "versionCode": 9,
+    "note": "Android 9+ \u00b7 signed release \u00b7 73.7 MiB",
+    "versionName": "0.1.9",
+    "versionCode": 10,
     "minSdk": 28,
-    "size": 45831933,
-    "sha256": "44a60fb7b086923322bbd0030a949b887485456fdb13cb3ac57f82929db8f84e"
+    "size": 77260552,
+    "sha256": "49f388f3bebffe78720370579a13f46c8d70efcc1437e5febb4a09a90bc667a1"
   }
 }
