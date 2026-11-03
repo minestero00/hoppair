@@ -89,6 +89,8 @@ Create your own persistent Android signing key once with `python3 scripts/create
 
 The packaging command builds both apps and writes a Mac ZIP, signed Android APK, and SHA-256 checksums to `dist/release/`. The Mac archive targets the build machine's architecture. Publish those files after the relevant local gates pass. Public Mac downloads should use Developer ID signing and notarization; never upload signing keys or local configuration.
 
+Set `HOPPAIR_OUTPUT_DIR` to stage the Mac app in a separate directory. Building, notarization and packaging use that same app; the notarization receipt is saved beside it as `notarization.json`. Release archives still go to `dist/release/`. A running app at the selected build path must be quit before rebuilding.
+
 The requested version must match both app builds; mismatches fail before archives can receive incorrect filenames. For a platform-only release, package the changed app separately and use the [feed preparation command](updates.md#release-order) with the unchanged other binary.
 
 For notarized Mac releases, use your own **Developer ID Application** identity. With Xcode's signed-in account:

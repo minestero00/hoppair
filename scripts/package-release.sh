@@ -6,8 +6,13 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
     echo 'Use a semantic version, such as 0.1.1.' >&2
     exit 1
 fi
+OUTPUT_DIR="${HOPPAIR_OUTPUT_DIR:-$ROOT/dist}"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
+export HOPPAIR_OUTPUT_DIR="$OUTPUT_DIR"
+APP="$OUTPUT_DIR/Hoppair.app"
 "$ROOT/scripts/build-mac.sh"
-python3 - "$ROOT/dist/Hoppair.app/Contents/Info.plist" "$VERSION" <<'PY'
+python3 - "$APP/Contents/Info.plist" "$VERSION" <<'PY'
 import plistlib,sys
 actual=plistlib.load(open(sys.argv[1],'rb'))['CFBundleShortVersionString']
 if actual != sys.argv[2]:
@@ -32,7 +37,7 @@ PY
 OUTPUT="$ROOT/dist/release/$VERSION"
 mkdir -p "$OUTPUT"
 ARCH="$(uname -m)"
-ditto -c -k --sequesterRsrc --keepParent "$ROOT/dist/Hoppair.app" "$OUTPUT/Hoppair-$VERSION-macos-$ARCH.zip"
+ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUTPUT/Hoppair-$VERSION-macos-$ARCH.zip"
 cp "$ROOT/dist/Hoppair-android-release.apk" "$OUTPUT/Hoppair-$VERSION-android.apk"
 cd "$OUTPUT"
 shasum -a 256 ./*.zip ./*.apk > SHA256SUMS.txt
