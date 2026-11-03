@@ -1,14 +1,14 @@
 {
-  "version": "0.1.4",
-  "message": "v0.1.4 is available.",
+  "version": "0.1.5",
+  "message": "v0.1.5 is available.",
   "mac": {
-    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.4/Hoppair-0.1.4-macos-arm64.zip",
+    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.5/Hoppair-0.1.5-macos-arm64.zip",
     "label": "Download for Mac",
-    "note": "v0.1.4 · Developer ID signed · Apple notarized · 4.3 MiB"
+    "note": "v0.1.5 · Developer ID signed · Apple notarized · 1.9 MiB"
   },
   "android": {
-    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.4/Hoppair-0.1.4-android.apk",
+    "url": "https://github.com/minestero00/hoppair/releases/download/v0.1.5/Hoppair-0.1.5-android.apk",
     "label": "Download APK",
-    "note": "Android 9+ · signed release · 43.6 MiB"
+    "note": "Android 9+ · signed release · 43.4 MiB"
   }
 }
