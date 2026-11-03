@@ -107,7 +107,7 @@ internal fun ShelfItem(entry: ShelfEntry, onDetails: () -> Unit, onCopy: (String
         Row(Modifier.clickable(onClick = onDetails).padding(start = 16.dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                Icon(entryIcon(entry), null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Icon(entryIcon(entry), null, tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(entry.title.substringBefore('\n'), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -199,7 +199,8 @@ internal fun WelcomePanel(busy: Boolean, onScan: () -> Unit, onManual: () -> Uni
             contentPadding = PaddingValues(16.dp)) {
             Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
         }
-        TextButton(onClick = onManual, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Use a pairing link") }
+        TextButton(onClick = onManual, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp),
+            colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) { Text("Use a pairing link") }
         Spacer(Modifier.height(16.dp))
         Text("On your Mac, open Hoppair → Connect Phone.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const release = require('../../site/release.json');
 for (const width of [1440, 768, 375, 320]) {
   test(`layout at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
@@ -44,8 +45,12 @@ test('reduced motion and no-JS download fallback', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false, reducedMotion: 'reduce' });
   const page = await context.newPage();
   await page.goto('./');
-  await expect(page.locator('[data-download="mac"]')).toHaveAttribute('href', /github\.com/);
+  await expect(page.locator('[data-download="mac"]')).toHaveAttribute('href', release.mac.url);
+  await expect(page.locator('[data-download="android"]')).toHaveAttribute('href', release.android.url);
+  await expect(page.locator('[data-release-status]')).toHaveText(release.message);
   await expect(page.locator('[data-theme-controls]')).toBeHidden();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).toBe('auto');
+  await page.goto('./connect/');
+  await expect(page.locator('[data-install]')).toHaveAttribute('href', release.android.url);
   await context.close();
 });

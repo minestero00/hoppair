@@ -12,6 +12,8 @@ open dist/Hoppair.app
 swift test --package-path apps/macos
 ```
 
+The Swift suite covers ping callback races, cancellation/timeouts, and real loopback WebSocket disconnect/reconnect and heartbeat checks.
+
 Quit Hoppair before rebuilding; the script refuses to replace a running app. Local builds use ad-hoc signing. Set `HOPPAIR_SIGN_IDENTITY` to use your own signing identity. Rebuilt development apps may require renewed Keychain approval.
 
 ## Android
@@ -59,7 +61,7 @@ After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately i
 ## Package a release
 
 ```bash
-./scripts/package-release.sh 0.1.3
+./scripts/package-release.sh 0.1.4
 ```
 
 Existing MacDroid signing configurations are reused automatically; do not generate a replacement key for an existing installation. `MACDROID_*` signing/build environment variables remain accepted as fallbacks.
@@ -82,7 +84,7 @@ For command-line packaging, use an existing `notarytool` Keychain profile:
 ```bash
 HOPPAIR_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 HOPPAIR_NOTARY_PROFILE=hoppair-notary \
-./scripts/package-release.sh 0.1.3
+./scripts/package-release.sh 0.1.4
 ```
 
 Create the profile yourself with `xcrun notarytool store-credentials hoppair-notary`; credentials stay outside Git. The packaging script enables hardened runtime, waits for notarization, staples the ticket, and then archives the app.

@@ -80,6 +80,7 @@ class ShelfUiTest {
             screenshot(screenshots, "shelf-light")
             tapText("A few things for tomorrow")
             waitText("Keep it simple", contains = true)
+            screenshot(screenshots, "note-details")
             tapText("Copy")
             waitText("Copied")
             tapDescription("Close")
@@ -192,11 +193,17 @@ class ShelfUiTest {
         recoverSystemUi()
         try {
             compose.waitUntil(timeoutMillis = 15000) {
-                compose.onAllNodesWithText(text, substring = contains, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+                try {
+                    compose.onAllNodesWithText(text, substring = contains, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+                } catch (_: IllegalStateException) { false } // A dialog/configuration transition may briefly have no root.
             }
         } catch (error: Throwable) {
             File(checkNotNull(context.getExternalFilesDir(null)), "ui-review/semantics-failure.txt")
-                .writeText(compose.onRoot(useUnmergedTree = true).printToString())
+                .writeText(runCatching { compose.onRoot(useUnmergedTree = true).printToString() }.getOrElse { "No Compose root while waiting for: $text\n" + it.message })
+            runCatching { automation.takeScreenshot()?.let { image ->
+                File(checkNotNull(context.getExternalFilesDir(null)), "ui-review/failure.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                image.recycle()
+            } }
             throw error
         }
         compose.onAllNodesWithText(text, substring = contains, useUnmergedTree = true).onFirst().assertIsDisplayed()

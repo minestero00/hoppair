@@ -15,30 +15,41 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 
+// Match the Mac's neutral surfaces and charcoal actions; blue identifies links.
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF2859D9), onPrimary = Color.White,
-    primaryContainer = Color(0xFFEAF0FF), onPrimaryContainer = Color(0xFF24469A),
-    secondary = Color(0xFF556078), onSecondary = Color.White,
-    secondaryContainer = Color(0xFFEDF0F6), onSecondaryContainer = Color(0xFF38435B),
-    background = Color(0xFFF6F7FA), onBackground = Color(0xFF181C26),
-    surface = Color.White, onSurface = Color(0xFF181C26),
-    surfaceVariant = Color(0xFFEEF0F5), onSurfaceVariant = Color(0xFF5D6577),
-    outline = Color(0xFF737D91), outlineVariant = Color(0xFFE1E5ED),
-    surfaceContainer = Color.White, surfaceContainerLow = Color.White,
-    surfaceContainerHigh = Color(0xFFEEF0F5),
+    primary = Color(0xFF212121), onPrimary = Color.White,
+    primaryContainer = Color(0xFFF1F1F3), onPrimaryContainer = Color(0xFF27292D),
+    secondary = Color(0xFF2164CE), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEAF1FF), onSecondaryContainer = Color(0xFF244A8B),
+    tertiary = Color(0xFF60636B), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFEEEEF0), onTertiaryContainer = Color(0xFF27292D),
+    background = Color(0xFFF7F7F8), onBackground = Color(0xFF1B1C1F),
+    surface = Color.White, onSurface = Color(0xFF1B1C1F),
+    surfaceVariant = Color(0xFFF0F0F2), onSurfaceVariant = Color(0xFF60636B),
+    outline = Color(0xFF797C84), outlineVariant = Color(0xFFE3E3E6),
+    surfaceTint = Color(0xFF212121),
+    inverseSurface = Color(0xFF303136), inverseOnSurface = Color(0xFFF3F3F5), inversePrimary = Color(0xFF8AB4F8),
+    surfaceBright = Color.White, surfaceDim = Color(0xFFE0E0E3),
+    surfaceContainerLowest = Color.White, surfaceContainerLow = Color.White,
+    surfaceContainer = Color.White, surfaceContainerHigh = Color(0xFFF0F0F2), surfaceContainerHighest = Color(0xFFE7E8EB),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFA8C0FF), onPrimary = Color(0xFF10275B),
-    primaryContainer = Color(0xFF253759), onPrimaryContainer = Color(0xFFDCE6FF),
-    secondary = Color(0xFFB6C1D9), onSecondary = Color(0xFF243047),
-    secondaryContainer = Color(0xFF2B3241), onSecondaryContainer = Color(0xFFDCE3F2),
-    background = Color(0xFF111318), onBackground = Color(0xFFECEEF5),
-    surface = Color(0xFF1B1E26), onSurface = Color(0xFFECEEF5),
-    surfaceVariant = Color(0xFF272C37), onSurfaceVariant = Color(0xFFB2BACB),
-    outline = Color(0xFF858FA4), outlineVariant = Color(0xFF353C4B),
-    surfaceContainer = Color(0xFF1B1E26), surfaceContainerLow = Color(0xFF1B1E26),
-    surfaceContainerHigh = Color(0xFF272C37),
+    primary = Color(0xFFE0E0E0), onPrimary = Color(0xFF1F1F1F),
+    primaryContainer = Color(0xFF2C2D30), onPrimaryContainer = Color(0xFFE7E8EA),
+    secondary = Color(0xFF8AB4F8), onSecondary = Color(0xFF102B55),
+    secondaryContainer = Color(0xFF24334B), onSecondaryContainer = Color(0xFFDBE8FF),
+    tertiary = Color(0xFFB7BBC3), onTertiary = Color(0xFF28292D),
+    tertiaryContainer = Color(0xFF303136), onTertiaryContainer = Color(0xFFE7E8EA),
+    background = Color(0xFF121315), onBackground = Color(0xFFECEDEE),
+    surface = Color(0xFF1B1C1F), onSurface = Color(0xFFECEDEE),
+    surfaceVariant = Color(0xFF28292D), onSurfaceVariant = Color(0xFFB7BBC3),
+    outline = Color(0xFF8A8D96), outlineVariant = Color(0xFF37383E),
+    surfaceTint = Color(0xFFE0E0E0),
+    inverseSurface = Color(0xFFE6E7EA), inverseOnSurface = Color(0xFF303136), inversePrimary = Color(0xFF2164CE),
+    surfaceBright = Color(0xFF35363A), surfaceDim = Color(0xFF121315),
+    surfaceContainerLowest = Color(0xFF101113), surfaceContainerLow = Color(0xFF1B1C1F),
+    surfaceContainer = Color(0xFF1B1C1F), surfaceContainerHigh = Color(0xFF28292D), surfaceContainerHighest = Color(0xFF33353A),
 )
 
 private val AppTypography = Typography(
@@ -71,6 +82,7 @@ internal fun HoppairTheme(content: @Composable () -> Unit) {
 }
 
 internal object ShelfColors {
-    @Composable fun success() = if (isSystemInDarkTheme()) Color(0xFFA0DFBC) else Color(0xFF276749)
+    @Composable fun success() = MaterialTheme.colorScheme.onSurface
+    @Composable fun link() = MaterialTheme.colorScheme.secondary
     @Composable fun warning() = if (isSystemInDarkTheme()) Color(0xFFFFCD8B) else Color(0xFF865115)
 }

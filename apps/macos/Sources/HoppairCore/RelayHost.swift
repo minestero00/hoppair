@@ -29,6 +29,7 @@ public enum RelayIdentity {
 }
 
 @MainActor
+// Owners must call stop() before replacing/releasing a running host.
 public final class RelayHost {
     public var onState: ((Bool) -> Void)?
     private let base: String
@@ -36,6 +37,7 @@ public final class RelayHost {
     private let handler: (BridgeRequest) -> BridgeResponse
     private var task: Task<Void, Never>?
     private var socket: URLSessionWebSocketTask?
+    private var generation: UUID?
     public init(base: String, key: Data, handler: @escaping (BridgeRequest) -> BridgeResponse) {
         self.base = base; self.key = key; self.handler = handler
     }
@@ -43,10 +45,12 @@ public final class RelayHost {
         let url = try RelayIdentity.endpoint(base: base, key: key, role: "host")
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("Bearer " + RelayIdentity.auth(key: key), forHTTPHeaderField: "Authorization")
-        task?.cancel()
+        stop()
+        let generation = UUID()
+        self.generation = generation
         task = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self else { return }
+                guard let self, self.generation == generation else { return }
                 let socket = URLSession.shared.webSocketTask(with: request)
                 socket.maximumMessageSize = Wire.maxFrameSize
                 self.socket = socket
@@ -54,6 +58,11 @@ public final class RelayHost {
                 var heartbeat: Task<Void, Never>?
                 do {
                     try await Self.ping(socket)
+                    try Task.checkCancellation()
+                    guard self.generation == generation else {
+                        socket.cancel(with: .goingAway, reason: nil)
+                        return
+                    }
                     self.onState?(true)
                     heartbeat = Task {
                         do {
@@ -65,6 +74,8 @@ public final class RelayHost {
                     }
                     while !Task.isCancelled {
                         let message = try await socket.receive()
+                        try Task.checkCancellation()
+                        guard self.generation == generation else { break }
                         guard case .data(let encrypted) = message, encrypted.count <= Wire.maxFrameSize else { continue }
                         let request = try JSONDecoder().decode(BridgeRequest.self, from: Wire.open(encrypted, key: self.key))
                         guard request.version == 1, abs(Date().timeIntervalSince1970 - request.issuedAt) <= 60 else { continue }
@@ -77,16 +88,21 @@ public final class RelayHost {
                 } catch { /* Retain queued items on the devices; reconnect without logging keys or content. */ }
                 heartbeat?.cancel()
                 socket.cancel(with: .goingAway, reason: nil)
+                guard self.generation == generation else { return }
+                self.socket = nil
                 self.onState?(false)
                 if Task.isCancelled { return }
                 do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
             }
         }
     }
-    public func stop() { task?.cancel(); task = nil; socket?.cancel(with: .goingAway, reason: nil); socket = nil; onState?(false) }
+    public func stop() {
+        generation = nil
+        task?.cancel(); task = nil
+        socket?.cancel(with: .goingAway, reason: nil); socket = nil
+        onState?(false)
+    }
     private static func ping(_ socket: URLSessionWebSocketTask) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            socket.sendPing { error in if let error { continuation.resume(throwing: error) } else { continuation.resume() } }
-        }
+        try await RelayPing.wait { socket.sendPing(pongReceiveHandler: $0) }
     }
 }

@@ -39,7 +39,8 @@ internal fun ConnectionSheet(state: ShelfState, manual: Boolean, link: String, o
                 shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(16.dp)) {
                 Icon(Icons.Outlined.QrCodeScanner, null); Spacer(Modifier.width(10.dp)); Text("Scan QR to connect")
             }
-            TextButton(onClick = onManual, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (manual) "Hide pairing link" else "Use a pairing link") }
+            TextButton(onClick = onManual, modifier = Modifier.heightIn(min = 48.dp),
+                colors = ButtonDefaults.textButtonColors(contentColor = ShelfColors.link())) { Text(if (manual) "Hide pairing link" else "Use a pairing link") }
             if (manual) {
                 OutlinedTextField(value = link, onValueChange = onLink, label = { Text("Pairing link from your Mac") },
                     modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4, enabled = !state.busy, shape = RoundedCornerShape(16.dp))
@@ -101,7 +102,7 @@ internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpe
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             SheetHeading(when (entry.kind) { "file" -> "File"; "link" -> "Link"; else -> "Note" }, onDismiss)
             Box(Modifier.size(56.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-                Icon(entryIcon(entry), null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
+                Icon(entryIcon(entry), null, Modifier.size(28.dp), tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant)
             }
             SelectionContainer { Text(if (entry.kind == "file") entry.filename else entry.text ?: entry.title, style = MaterialTheme.typography.bodyLarge) }
             Text(if (entry.pending) "Waiting to send · saved on this phone" else entryMetadata(entry),
@@ -112,7 +113,10 @@ internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpe
                 }
             }
             entry.text?.let { text ->
-                OutlinedButton(onClick = { onCopy(text); copied = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp)) {
+                Button(onClick = { onCopy(text); copied = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (entry.kind == "text") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if (entry.kind == "text") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer)) {
                     Icon(if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy, null)
                     Spacer(Modifier.width(8.dp)); Text(if (copied) "Copied" else "Copy")
                 }
