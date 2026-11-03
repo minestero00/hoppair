@@ -4,7 +4,7 @@
 
 A native macOS + Android companion for sharing files, links, notes, and phone photos.
 
-**Early release.** Android syncs while the app is open. Cross-network connections require a self-hosted relay. The Mac binary awaits Apple notarization; source builds are available.
+**Early release.** Android syncs while the app is open. Cross-network connections require a self-hosted relay.
 
 - Pair by scanning a QR code.
 - Share through a persistent shelf, Android's share menu, and Mac drag and drop.

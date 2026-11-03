@@ -7,7 +7,7 @@ Get both apps from [GitHub Releases](https://github.com/minestero00/macDroid/rel
 1. Download the macOS ARM64 ZIP and unzip it.
 2. Move `MacDroid.app` to Applications and open it.
 
-Requires macOS 14 or later on Apple silicon. Check the release notes for that build’s signing and notarization status. If macOS blocks a download, use the normal **Privacy & Security → Open Anyway** flow after verifying its source, or [build from source](development.md).
+Requires macOS 14 or later on Apple silicon. The v0.1.0 Mac ZIP is Developer ID signed and Apple notarized. [Source builds](development.md) are also available.
 
 ## Android
 
