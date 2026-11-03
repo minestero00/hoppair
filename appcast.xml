@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Hoppair Updates</title>
+    <link>https://minestero00.github.io/hoppair/</link>
+    <description>Stable Hoppair releases for macOS.</description>
+    <item>
+      <title>Hoppair 0.1.6</title>
+      <pubDate>Tue, 03 Nov 2026 08:29:56 GMT</pubDate>
+      <link>https://github.com/minestero00/hoppair/releases/tag/v0.1.6</link>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+      <enclosure url="https://github.com/minestero00/hoppair/releases/download/v0.1.6/Hoppair-0.1.6-macos-arm64.zip" length="3136630" type="application/octet-stream" sparkle:version="14" sparkle:shortVersionString="0.1.6" sparkle:edSignature="9uCjxBBCvPD5RZgZrXIguGlugzQIYAhtu+4I3NzKdrevISTNLJXXUHZB8aO1O7awfdelWcr3QhrMkm4NiSu7Bw=="></enclosure>
+    </item>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: mTb2FQvoWc+GyOXsJlx5GKXjy5OBa3QOnm2AqLQHU/35HsG/v9Ne5/ht9il8LP4tqIcC+/gpoEtFdqwWEnaNBA==
+length: 1249
+-->
