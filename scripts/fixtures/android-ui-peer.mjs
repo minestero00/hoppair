@@ -21,7 +21,7 @@ net.createServer(socket=>{
    decipher.setAuthTag(frame.subarray(-16));
    const req=JSON.parse(Buffer.concat([decipher.update(frame.subarray(12,-16)),decipher.final()]));
    let result={ok:true,requestId:req.requestId};
-   if(req.action==='list')result={...result,items,cameraRequest:null};
+   if(req.action==='list'||req.action==='listPage')result={...result,items,cameraRequest:null};
    if(req.action==='get')result.data=files.get(req.id)?.toString('base64');
    if(req.action==='put'&&!items.some(i=>i.id===req.item.id)){items.unshift(req.item);if(req.data)files.set(req.item.id,Buffer.from(req.data,'base64'));}
    const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key,iv);

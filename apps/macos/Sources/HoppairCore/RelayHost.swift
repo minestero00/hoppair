@@ -16,7 +16,12 @@ public enum RelayIdentity {
         derive("macdroid-relay-auth-v1", key: key).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
     public static func endpoint(base: String, key: Data, role: String) throws -> URL {
-        guard var components = URLComponents(string: base), let host = components.host,
+        guard key.count == 32 else { throw BridgeError.invalid("Invalid pairing key.") }
+        guard ["host", "phone"].contains(role) else { throw BridgeError.invalid("Invalid relay role.") }
+        guard var components = URLValidation.components(base), let host = components.host, URLValidation.validHost(host),
+              components.percentEncodedHost == host,
+              ["", "/"].contains(components.path), components.query == nil, components.fragment == nil,
+              components.port.map({ (1...65535).contains($0) }) ?? true,
               components.user == nil, components.password == nil,
               components.scheme == "wss" || (components.scheme == "ws" && ["127.0.0.1", "localhost"].contains(host)) else {
             throw BridgeError.invalid("Relay addresses must start with wss://.")
@@ -34,12 +39,13 @@ public final class RelayHost {
     public var onState: ((Bool) -> Void)?
     private let base: String
     private let key: Data
+    private let requestGuard: RequestReplayGuard
     private let handler: (BridgeRequest) -> BridgeResponse
     private var task: Task<Void, Never>?
     private var socket: URLSessionWebSocketTask?
     private var generation: UUID?
-    public init(base: String, key: Data, handler: @escaping (BridgeRequest) -> BridgeResponse) {
-        self.base = base; self.key = key; self.handler = handler
+    public init(base: String, key: Data, requestGuard: RequestReplayGuard = RequestReplayGuard(), handler: @escaping (BridgeRequest) -> BridgeResponse) {
+        self.base = base; self.key = key; self.requestGuard = requestGuard; self.handler = handler
     }
     public func start() throws {
         let url = try RelayIdentity.endpoint(base: base, key: key, role: "host")
@@ -78,8 +84,11 @@ public final class RelayHost {
                         guard self.generation == generation else { break }
                         guard case .data(let encrypted) = message, encrypted.count <= Wire.maxFrameSize else { continue }
                         let request = try JSONDecoder().decode(BridgeRequest.self, from: Wire.open(encrypted, key: self.key))
-                        guard request.version == 1, abs(Date().timeIntervalSince1970 - request.issuedAt) <= 60 else { continue }
-                        var response = self.handler(request)
+                        var response: BridgeResponse
+                        do {
+                            try self.requestGuard.admit(request)
+                            response = self.handler(request)
+                        } catch { response = BridgeResponse(ok: false, error: error.localizedDescription) }
                         response.requestId = request.requestId
                         let payload = try Wire.seal(JSONEncoder().encode(response), key: self.key)
                         guard payload.count <= Wire.maxFrameSize else { continue }

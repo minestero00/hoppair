@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -14,8 +15,12 @@ import java.net.URLDecoder
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
-import okhttp3.*
-import okio.ByteString.Companion.toByteString
+import org.java_websocket.WebSocket
+import org.java_websocket.framing.Framedata
+import org.java_websocket.client.WebSocketClient
+import org.java_websocket.handshake.ServerHandshake
+import java.nio.ByteBuffer
+import javax.net.ssl.SSLParameters
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
@@ -26,30 +31,38 @@ import javax.crypto.spec.SecretKeySpec
 
 internal const val MAX_FILE = 8 * 1024 * 1024
 internal const val MAX_FRAME = 12 * 1024 * 1024
+private const val MAX_PAIRING_LINK = 8192
 
 internal data class Pairing(val host: String, val port: Int, val key: ByteArray, val relay: String? = null) {
     companion object {
         fun parse(link: String): Pairing {
+            require(link.length <= MAX_PAIRING_LINK && link.toByteArray(Charsets.UTF_8).size <= MAX_PAIRING_LINK) { "Invalid pairing code." }
             val outer = URI(link.trim())
             val uri = if (outer.scheme == "https") {
-                require(outer.userInfo == null && outer.port in listOf(-1, 443) &&
+                require(outer.userInfo == null && outer.rawQuery == null && outer.port in listOf(-1, 443) &&
                     ((outer.host == "hoppair-connect.macdroid-relay.workers.dev" && outer.path in listOf("/connect", "/connect/")) ||
                     (outer.host == "minestero00.github.io" && outer.path == "/hoppair/connect/"))) { "Use the pairing QR code shown on your Mac." }
-                val payload = outer.rawFragment?.split("&")?.singleOrNull { it.startsWith("pair=") }?.removePrefix("pair=")
+                val payload = outer.rawFragment?.takeIf { it.startsWith("pair=") && !it.contains('&') }?.removePrefix("pair=")
                     ?: error("The pairing code is missing.")
                 require(payload.length <= 4096 && payload.matches(Regex("[A-Za-z0-9_-]+={0,2}"))) { "Invalid pairing code." }
                 URI(String(Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP), Charsets.UTF_8))
             } else outer
             require(uri.scheme in setOf("hoppair", "macdroid") && uri.userInfo == null && uri.fragment == null && uri.path in listOf("", "/") && !uri.host.isNullOrBlank() && uri.port in 1..65535) { "Paste the pairing link from your Mac." }
-            val encoded = uri.rawQuery?.split("&")?.firstOrNull { it.startsWith("key=") }?.removePrefix("key=") ?: error("The pairing key is missing.")
+            val parameters = uri.rawQuery?.split("&").orEmpty()
+            require(parameters.all { it.startsWith("key=") || it.startsWith("relay=") } &&
+                parameters.count { it.startsWith("key=") } == 1 &&
+                parameters.count { it.startsWith("relay=") } <= 1) { "Invalid pairing code." }
+            val encoded = parameters.single { it.startsWith("key=") }.removePrefix("key=")
             val decodedKey = URLDecoder.decode(encoded, "UTF-8")
             require(decodedKey.matches(Regex("[A-Za-z0-9_-]{43}=?"))) { "Invalid pairing key." }
             val key = Base64.decode(decodedKey, Base64.URL_SAFE or Base64.NO_WRAP)
             require(key.size == 32) { "Invalid pairing key." }
-            val relay = uri.rawQuery?.split("&")?.firstOrNull { it.startsWith("relay=") }?.removePrefix("relay=")?.let { URLDecoder.decode(it, "UTF-8") }
+            val relay = parameters.singleOrNull { it.startsWith("relay=") }?.removePrefix("relay=")?.let { URLDecoder.decode(it, "UTF-8") }
             if (relay != null) {
                 val remote = URI(relay)
-                require(remote.userInfo == null && remote.fragment == null && !remote.host.isNullOrBlank() && (remote.scheme == "wss" ||
+                require(remote.userInfo == null && remote.fragment == null && remote.rawQuery == null &&
+                    remote.path in listOf("", "/") && remote.port in -1..65535 && remote.port != 0 &&
+                    !remote.host.isNullOrBlank() && (remote.scheme == "wss" ||
                     (BuildConfig.DEBUG && remote.scheme == "ws" && remote.host in listOf("127.0.0.1", "localhost", "10.0.2.2")))) { "Check the relay address." }
             }
             return Pairing(uri.host, uri.port, key, relay)
@@ -59,12 +72,13 @@ internal data class Pairing(val host: String, val port: Int, val key: ByteArray,
 
 internal object PayloadCrypto {
     fun seal(plain: ByteArray, key: ByteArray): ByteArray {
+        require(key.size == 32 && plain.size <= MAX_FRAME - 28) { "Invalid frame." }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
         return cipher.iv + cipher.doFinal(plain)
     }
     fun open(encrypted: ByteArray, key: ByteArray): ByteArray {
-        require(encrypted.size >= 28) { "Invalid frame." }
+        require(key.size == 32 && encrypted.size in 28..MAX_FRAME) { "Invalid frame." }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, encrypted.copyOfRange(0, 12)))
         return cipher.doFinal(encrypted.copyOfRange(12, encrypted.size))
@@ -72,6 +86,7 @@ internal object PayloadCrypto {
 }
 
 internal class PeerRejected(message: String) : Exception(message)
+internal class PeerVerificationFailed(message: String, cause: Exception? = null) : Exception(message, cause)
 
 // Stable v1 derivation labels preserve existing relay enrollment across the rename.
 internal object RelayIdentity {
@@ -88,7 +103,40 @@ internal object RelayIdentity {
 internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
     private var localFailed = false
     private var relay: RelaySocket? = null
-    fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null): JSONObject {
+    @Synchronized fun call(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null): JSONObject =
+        if (action == "list") listPages() else callSingle(action, item, data, id)
+    private fun listPages(): JSONObject {
+        val items = JSONArray()
+        val seenItems = mutableSetOf<String>()
+        val seenCursors = mutableSetOf<String>()
+        var cursor: String? = null
+        var first: JSONObject? = null
+        do {
+            val page = try { callSingle("listPage", id = cursor) }
+            catch (error: PeerRejected) {
+                if (error.message == "Unsupported action.") throw PeerRejected("Update Hoppair on your Mac, then reconnect.")
+                throw error
+            }
+            if (first == null) first = page
+            val batch = page.getJSONArray("items")
+            require(batch.length() <= 100 && items.length() + batch.length() <= MAX_SHELF_ITEMS) { "Invalid shelf page size." }
+            for (i in 0 until batch.length()) {
+                val item = batch.getJSONObject(i)
+                val itemId = item.getString("id")
+                require(UUID.fromString(itemId).toString().equals(itemId, ignoreCase = true) && seenItems.add(itemId.lowercase())) { "Invalid or duplicate shelf item." }
+                items.put(item)
+            }
+            cursor = if (page.isNull("nextCursor")) null else page.get("nextCursor") as? String ?: error("Invalid shelf cursor.")
+            if (cursor != null) {
+                require(batch.length() > 0 && items.length() < MAX_SHELF_ITEMS &&
+                    UUID.fromString(cursor).toString().equals(cursor, ignoreCase = true) &&
+                    cursor.equals(batch.getJSONObject(batch.length() - 1).getString("id"), ignoreCase = true) && seenCursors.add(cursor.lowercase())) { "Invalid shelf cursor." }
+            }
+        } while (cursor != null)
+        return checkNotNull(first).put("items", items).also { it.remove("nextCursor") }
+    }
+    private fun callSingle(action: String, item: JSONObject? = null, data: ByteArray? = null, id: String? = null): JSONObject {
+        require(data == null || data.size <= MAX_FILE) { "Files must be 8 MiB or smaller." }
         val request = JSONObject().put("version", 1).put("requestId", UUID.randomUUID().toString())
             .put("issuedAt", System.currentTimeMillis() / 1000.0).put("action", action)
         item?.let { request.put("item", it) }
@@ -97,16 +145,15 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
         val encrypted = PayloadCrypto.seal(request.toString().toByteArray(Charsets.UTF_8), pairing.key)
         require(encrypted.size <= MAX_FRAME) { "Transfer exceeds the size limit." }
         if (!localFailed) {
-            try { return decode(local(encrypted)) }
+            try { return decode(local(encrypted), request.getString("requestId")) }
             catch (error: Exception) {
-                if (error is PeerRejected || pairing.relay == null) throw error
+                if (error is PeerRejected || error is PeerVerificationFailed || pairing.relay == null) throw error
                 localFailed = true
             }
         }
         val channel = relay ?: RelaySocket(pairing).also { relay = it }
-        val response = decode(channel.exchange(encrypted))
-        require(response.optString("requestId") == request.getString("requestId")) { "Could not verify the response. Please reconnect." }
-        return response
+        return try { decode(channel.exchange(encrypted), request.getString("requestId")) }
+        catch (error: Exception) { channel.abort(); relay = null; throw error }
     }
     private fun local(encrypted: ByteArray): ByteArray = Socket().use { socket ->
         socket.connect(InetSocketAddress(pairing.host, pairing.port), if (pairing.relay != null) 900 else 3500)
@@ -118,49 +165,103 @@ internal class BridgeClient(private val pairing: Pairing) : java.io.Closeable {
         require(length in 28..MAX_FRAME) { "Invalid response size." }
         ByteArray(length).also { input.readFully(it) }
     }
-    private fun decode(encrypted: ByteArray): JSONObject = JSONObject(String(PayloadCrypto.open(encrypted, pairing.key), Charsets.UTF_8)).also {
-        if (!it.optBoolean("ok")) throw PeerRejected(it.optString("error", "Transfer failed."))
+    private fun decode(encrypted: ByteArray, requestId: String): JSONObject {
+        val response = try { JSONObject(String(PayloadCrypto.open(encrypted, pairing.key), Charsets.UTF_8)) }
+        catch (error: Exception) { throw PeerVerificationFailed("Could not verify this connection. Scan your Mac’s pairing QR code again.", error) }
+        if (!response.has("requestId")) throw PeerVerificationFailed("Update Hoppair on your Mac, then reconnect. This Mac cannot verify replies yet.")
+        if (response.opt("requestId") != requestId || response.opt("ok") !is Boolean) {
+            throw PeerVerificationFailed("Could not verify the response. Please reconnect.")
+        }
+        if (!response.getBoolean("ok")) throw PeerRejected(response.optString("error", "Transfer failed.").take(240).filter { !it.isISOControl() })
+        return response
     }
     override fun close() { relay?.close(); relay = null }
 }
 
 private class RelaySocket(pairing: Pairing) : java.io.Closeable {
     private val opened = CountDownLatch(1)
-    private val responses = LinkedBlockingQueue<Result<ByteArray>>()
+    private val responses = LinkedBlockingQueue<Result<ByteArray>>(1)
+    private val stateLock = Any()
+    private val sendLock = Any()
+    private var awaitingResponse = false
+    private var terminalError: Exception? = null
     @Volatile private var openError: Exception? = null
-    private val socket: okhttp3.WebSocket
+    private val socket: WebSocketClient
     init {
         val base = URI(checkNotNull(pairing.relay))
         val endpoint = URI(base.scheme, null, base.host, base.port, "/room/" + RelayIdentity.room(pairing.key), "role=phone", null)
-        val request = Request.Builder().url(endpoint.toString()).header("Authorization", "Bearer " + RelayIdentity.auth(pairing.key)).build()
-        socket = http.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(webSocket: okhttp3.WebSocket, response: Response) { opened.countDown() }
-            override fun onMessage(webSocket: okhttp3.WebSocket, bytes: okio.ByteString) {
-                if (bytes.size in 28..MAX_FRAME) responses.offer(Result.success(bytes.toByteArray()))
-                else responses.offer(Result.failure(java.io.IOException("Transfer exceeds the size limit.")))
+        socket = object : WebSocketClient(endpoint, BoundedRelayDraft(), mapOf("Authorization" to "Bearer " + RelayIdentity.auth(pairing.key)), 5000) {
+            override fun onOpen(handshake: ServerHandshake) { opened.countDown() }
+            override fun onMessage(message: String) {
+                fail(java.io.IOException("Invalid relay message.")); abort()
             }
-            override fun onFailure(webSocket: okhttp3.WebSocket, t: Throwable, response: Response?) {
-                val error = java.io.IOException("Could not connect through the relay. Check your Mac’s internet connection and open Hoppair.")
-                openError = error; opened.countDown(); responses.offer(Result.failure(error))
+            override fun onMessage(bytes: ByteBuffer) {
+                if (bytes.remaining() !in 28..MAX_FRAME) {
+                    fail(java.io.IOException("Transfer exceeds the size limit.")); abort(); return
+                }
+                synchronized(stateLock) {
+                    // One exchange is in flight; unsolicited/replayed frames never build a queue.
+                    if (awaitingResponse) {
+                        awaitingResponse = false
+                        responses.offer(Result.success(ByteArray(bytes.remaining()).also { bytes.get(it) }))
+                    }
+                }
             }
-            override fun onClosed(webSocket: okhttp3.WebSocket, code: Int, reason: String) {
-                responses.offer(Result.failure(java.io.IOException("Connection lost. Retrying shortly.")))
+            override fun onError(error: Exception) {
+                val friendly = java.io.IOException("Could not connect through the relay. Check your Mac’s internet connection and open Hoppair.")
+                openError = friendly; opened.countDown(); fail(friendly)
+                // The library may otherwise wait on a close handshake after malformed input.
+                runCatching { getSocket()?.close() }
             }
-            override fun onClosing(webSocket: okhttp3.WebSocket, code: Int, reason: String) { webSocket.close(code, null) }
-        })
-        if (!opened.await(6, TimeUnit.SECONDS) || openError != null) {
-            socket.cancel(); throw openError ?: java.net.SocketTimeoutException()
+            override fun onClose(code: Int, reason: String, remote: Boolean) {
+                val error = java.io.IOException(if (code == 1008) "Relay transfer limit reached. Try again shortly or use the same Wi-Fi as your Mac." else "Connection lost. Retrying shortly.")
+                if (opened.count > 0) openError = error
+                opened.countDown(); fail(error)
+            }
+            override fun onWebsocketPing(connection: WebSocket, frame: Framedata) {
+                synchronized(sendLock) {
+                    // A slow reader cannot turn automatic PONG replies into an unbounded write queue.
+                    if (connection.hasBufferedData()) {
+                        fail(java.io.IOException("Relay is not reading responses.")); abort()
+                    } else super.onWebsocketPing(connection, frame)
+                }
+            }
+            override fun onSetSSLParameters(parameters: SSLParameters) {
+                // Preserve system trust, SNI from the URI, and TLS hostname verification.
+                super.onSetSSLParameters(parameters)
+                parameters.endpointIdentificationAlgorithm = "HTTPS"
+            }
+        }
+        socket.setReceiveBufferSize(8192)
+        socket.setConnectionLostTimeout(0) // No automatic PING queue; every request has a 15-second response deadline.
+        socket.setDaemon(true)
+        socket.connect()
+        if (!opened.await(6, TimeUnit.SECONDS) || openError != null || !socket.isOpen) {
+            abort(); throw openError ?: java.net.SocketTimeoutException()
         }
     }
+    private fun fail(error: Exception) = synchronized(stateLock) {
+        terminalError = error
+        if (awaitingResponse) { awaitingResponse = false; responses.offer(Result.failure(error)) }
+    }
     fun exchange(payload: ByteArray): ByteArray {
-        if (!socket.send(payload.toByteString())) throw java.io.IOException("Connection lost.")
-        return responses.poll(15, TimeUnit.SECONDS)?.getOrThrow() ?: throw java.net.SocketTimeoutException()
+        synchronized(stateLock) {
+            terminalError?.let { throw it }
+            responses.clear(); awaitingResponse = true
+        }
+        try {
+            synchronized(sendLock) {
+                if (!socket.isOpen || socket.hasBufferedData()) throw java.io.IOException("Connection lost.")
+                socket.send(payload)
+            }
+            return responses.poll(15, TimeUnit.SECONDS)?.getOrThrow() ?: throw java.net.SocketTimeoutException()
+        } finally { synchronized(stateLock) { awaitingResponse = false } }
     }
-    override fun close() { socket.close(1000, null) }
-    companion object {
-        private val http = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS)
-            .pingInterval(20, TimeUnit.SECONDS).build()
+    fun abort() {
+        runCatching { socket.socket?.close() }
+        socket.closeConnection(1000, "Closed")
     }
+    override fun close() { abort() }
 }
 
 /** Only the pairing secret is stored here. The shelf is local app-private data. */
@@ -183,11 +284,30 @@ internal class PairingVault(context: Context) {
         catch (error: Exception) { atomic.failWrite(output); throw error }
     }
     fun load(): String? {
-        if (!file.exists()) return null
-        val data = file.readBytes()
+        val atomic = android.util.AtomicFile(file)
+        if (!file.exists() && !java.io.File(file.path + ".bak").exists()) return null
+        val data = atomic.openRead().use { it.readBytesBounded(MAX_PAIRING_LINK + 28) }
+        require(data.size >= 28) { "Invalid saved pairing. Scan your Mac’s pairing QR code again." }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, data.copyOfRange(0, 12)))
-        return String(cipher.doFinal(data.copyOfRange(12, data.size)))
+        return String(cipher.doFinal(data.copyOfRange(12, data.size)), Charsets.UTF_8).also { Pairing.parse(it) }
     }
-    fun clear() { file.delete() }
+    fun clear() { android.util.AtomicFile(file).delete() }
+}
+
+/** Reads at most limit + 1 bytes before rejecting; never allocates from an untrusted length. */
+internal fun java.io.InputStream.readBytesBounded(limit: Int, message: String = "Stored data exceeds the size limit."): ByteArray {
+    require(limit in 0 until Int.MAX_VALUE)
+    val output = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    while (output.size() <= limit) {
+        val count = read(buffer, 0, minOf(buffer.size, limit + 1 - output.size()))
+        if (count < 0) return output.toByteArray()
+        if (count == 0) {
+            val byte = read()
+            if (byte < 0) return output.toByteArray()
+            output.write(byte)
+        } else output.write(buffer, 0, count)
+    }
+    throw IllegalArgumentException(message)
 }

@@ -6,7 +6,7 @@ public enum BridgeError: LocalizedError {
     public var errorDescription: String? { if case .invalid(let text) = self { return text }; return nil }
 }
 
-public struct ShelfItem: Codable, Identifiable, Equatable {
+public struct ShelfItem: Codable, Identifiable, Equatable, Sendable {
     public var id: String
     public var kind: String
     public var title: String
@@ -25,7 +25,7 @@ public struct ShelfItem: Codable, Identifiable, Equatable {
     }
 }
 
-public struct BridgeRequest: Codable {
+public struct BridgeRequest: Codable, Sendable {
     public var version: Int = 1
     public var requestId: String = UUID().uuidString
     public var issuedAt: Double = Date().timeIntervalSince1970
@@ -37,16 +37,17 @@ public struct BridgeRequest: Codable {
         self.action = action; self.item = item; self.data = data; self.id = id
     }
 }
-public struct BridgeResponse: Codable {
+public struct BridgeResponse: Codable, Sendable {
     public var requestId: String?
     public var ok: Bool
     public var error: String?
     public var items: [ShelfItem]?
     public var data: String?
     public var cameraRequest: String?
+    public var nextCursor: String?
     public init(ok: Bool = true, error: String? = nil, items: [ShelfItem]? = nil,
-                data: String? = nil, cameraRequest: String? = nil) {
-        self.ok = ok; self.error = error; self.items = items; self.data = data; self.cameraRequest = cameraRequest
+                data: String? = nil, cameraRequest: String? = nil, nextCursor: String? = nil) {
+        self.ok = ok; self.error = error; self.items = items; self.data = data; self.cameraRequest = cameraRequest; self.nextCursor = nextCursor
     }
 }
 
@@ -55,10 +56,12 @@ public enum Wire {
     public static let maxFrameSize = 12 * 1024 * 1024
     public static func seal(_ data: Data, key: Data) throws -> Data {
         guard key.count == 32 else { throw BridgeError.invalid("Invalid pairing key.") }
+        guard data.count <= maxFrameSize - 28 else { throw BridgeError.invalid("Transfer exceeds the size limit.") }
         return try AES.GCM.seal(data, using: SymmetricKey(data: key)).combined!
     }
     public static func open(_ data: Data, key: Data) throws -> Data {
         guard key.count == 32 else { throw BridgeError.invalid("Invalid pairing key.") }
+        guard (28...maxFrameSize).contains(data.count) else { throw BridgeError.invalid("Invalid encrypted frame size.") }
         return try AES.GCM.open(AES.GCM.SealedBox(combined: data), using: SymmetricKey(data: key))
     }
     public static func frame(_ encrypted: Data) throws -> Data {

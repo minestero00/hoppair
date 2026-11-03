@@ -121,7 +121,7 @@ final class CoreTests: XCTestCase {
         let key = Data(repeating: 7, count: 32)
         XCTAssertEqual(RelayIdentity.room(key: key), "cd0ab698-24ee-465f-e4d6-ef293b3cd2cd")
         let first = try RelayIdentity.endpoint(base: "wss://relay.example", key: key, role: "host")
-        let second = try RelayIdentity.endpoint(base: "wss://relay.example/unused", key: key, role: "phone")
+        let second = try RelayIdentity.endpoint(base: "wss://relay.example/", key: key, role: "phone")
         XCTAssertEqual(first.path, second.path)
         XCTAssertNotEqual(RelayIdentity.auth(key: key), key.base64EncodedString())
         XCTAssertThrowsError(try RelayIdentity.endpoint(base: "ws://relay.example", key: key, role: "host"))

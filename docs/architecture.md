@@ -4,15 +4,16 @@ The Mac hosts the canonical shelf. Android keeps a local cache and persistent ou
 
 ## Transport
 
-Direct TCP uses port 49271. A frame is a 4-byte unsigned big-endian length followed by AES-256-GCM data: 12-byte nonce, ciphertext, 16-byte tag. The plaintext is UTF-8 JSON. Requests carry a version, request ID, timestamp, and action; requests older than 60 seconds are rejected.
+Direct TCP uses port 49271. A frame is a 4-byte unsigned big-endian length followed by AES-256-GCM data: 12-byte nonce, ciphertext, 16-byte tag. The plaintext is UTF-8 JSON. Requests carry a version, UUID request ID, timestamp, and action; timestamps outside a 60-second window are rejected. A shared, bounded in-memory replay guard rejects reused request IDs across direct and relay connections.
 
-The optional WSS relay carries one sealed payload per binary message, without the TCP length prefix. Relay responses include the request ID inside the ciphertext. Routing identity and authentication are HMAC-SHA256 derivatives with distinct labels; the server verifies an operator-provisioned token hash without learning the content key.
+The optional WSS relay carries one sealed payload per binary message, without the TCP length prefix. Both transports include the request ID inside encrypted replies; Android requires an exact match before interpreting success or errors. An integrity/correlation failure does not trigger relay fallback. Routing identity and authentication are HMAC-SHA256 derivatives with distinct labels; the server verifies an operator-provisioned token hash without learning the content key.
 
 ## Shelf actions
 
 | Action | Purpose |
 | --- | --- |
-| `list` | Shelf metadata and an optional camera request |
+| `listPage` | Bounded metadata page, optional next cursor and camera request |
+| `list` | Small legacy shelf snapshot; large shelves require an app update |
 | `put` | Add an item with optional base64 file data |
 | `get` | Fetch one file by ID |
 | `cameraAck` | Acknowledge a photo request |
@@ -21,13 +22,15 @@ The Mac writes file data and an atomic index before acknowledging `put`. Stable 
 
 Limits: 8 MiB per file, 64 KiB per text item, 12 MiB per encrypted frame, 500 shelf items. A full shelf rejects new items without removing old ones.
 
+Metadata pages contain at most 100 items and approximately 2 MiB of encoded JSON. `listPage.id` is the previous page's last item UUID; `nextCursor` repeats the new last UUID when another page remains. Android validates the complete snapshot, IDs, cursors, and metadata before applying it. JSON expansion cannot turn a valid large shelf into a single oversized frame. Large initial relay syncs remain subject to the [relay throughput limits](relay.md#security-and-operation).
+
 Pairing keys are held in macOS Keychain and protected by Android Keystore. QR codes transfer them out of band. Camera requests require confirmation on the phone.
 
 See the source definitions in [Protocol.swift](../apps/macos/Sources/HoppairCore/Protocol.swift) and [BridgeClient.kt](../apps/android/app/src/main/java/dev/macdroid/app/BridgeClient.kt).
 
 ## Upgrade compatibility
 
-Hoppair was previously named MacDroid. Version 0.1.1 keeps the original macOS bundle ID, Android application ID, storage paths, Keychain/Keystore aliases, and v1 relay derivation labels so existing installations retain their shelf and pairing. New QR codes use a verified HTTPS app link with the native pairing URI encoded in the URL fragment. Android accepts these invites plus `hoppair://` and legacy `macdroid://` links. Existing relay addresses remain valid. These internal identifiers are compatibility contracts, not the public product name.
+Hoppair was previously named MacDroid. It keeps the original macOS bundle ID, Android application ID, storage paths, Keychain/Keystore aliases, and v1 relay derivation labels so existing installations retain their shelf and pairing. New QR codes use a verified HTTPS app link with the native pairing URI encoded in the URL fragment. Android accepts these invites plus `hoppair://` and legacy `macdroid://` links. Existing relay addresses remain valid. These internal identifiers are compatibility contracts, not the public product name.
 
 ## Camera-to-app handoff
 

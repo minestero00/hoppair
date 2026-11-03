@@ -39,3 +39,13 @@ Limits: 8 MiB per file, 64 KiB per text item, 500 shelf items. This release targ
 ## Updating from MacDroid
 
 If you installed this project's MacDroid v0.1.0 release, install the official Hoppair release over it. On Mac, quit MacDroid and replace the old app with `Hoppair.app`; remove the old app bundle only after the new one opens. The shelf, pairing, and relay settings use the same internal app identity. Android release APKs update the existing package in place. No uninstallation or re-pairing is required; source builds still require their original release or debug signer.
+
+## App updates
+
+Install v0.1.6 once on **Mac first, then Android**. Older versions do not have the built-in updater. New Android builds require the Mac's correlated replies and paged shelf protocol.
+
+From v0.1.6, Mac checks automatically and offers download, installation, and relaunch through Sparkle. Use **Hoppair → Check for Updates…** to check manually. Android checks when opened; use **More → Check for updates** for a manual check. Tap **Update**, allow Hoppair as an installation source if Android asks, then confirm the system installer. Your shelf and pairing stay in place.
+
+The updater removes its own temporary downloads and installation files. Android also removes completed APKs when the updated app opens, and prunes stale downloads after 24 hours. Files you downloaded manually to Downloads are yours to remove. Mac releases use ZIP archives, not DMG installers.
+
+Read [security and trust boundaries](security.md) and the [release/update guide](updates.md) for verification and maintenance details.

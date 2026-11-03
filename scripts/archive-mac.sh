@@ -23,7 +23,7 @@ destination = archive / 'Products/Applications/Hoppair.app'
 if archive.exists():
     raise SystemExit('Archive already exists. Move it or choose another output path.')
 destination.parent.mkdir(parents=True)
-shutil.copytree(source, destination)
+shutil.copytree(source, destination, symlinks=True)
 with (source / 'Contents/Info.plist').open('rb') as file:
     app = plistlib.load(file)
 info = {

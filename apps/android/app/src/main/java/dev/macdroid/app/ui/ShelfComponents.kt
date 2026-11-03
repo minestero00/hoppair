@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +36,9 @@ import java.util.Locale
 import dev.chrisbanes.haze.HazeState
 
 @Composable
-internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, hazeState: HazeState, onSearch: () -> Unit, onConnection: () -> Unit) {
+internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, hazeState: HazeState, onSearch: () -> Unit, onConnection: () -> Unit,
+    onCheckUpdates: () -> Unit) {
+    var menu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
         .padding(horizontal = 16.dp, vertical = 8.dp).hoppairGlass(hazeState).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically) {
@@ -43,6 +47,13 @@ internal fun ShelfToolbar(searching: Boolean, canSearch: Boolean, hazeState: Haz
         Text("Hoppair", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         if (canSearch) IconButton(onClick = onSearch) { Icon(if (searching) Icons.Outlined.Close else Icons.Outlined.Search, if (searching) "Close search" else "Search your shelf") }
         IconButton(onClick = onConnection) { Icon(Icons.Outlined.LaptopMac, "Mac connection") }
+        Box {
+            IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, "More options") }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text("Check for updates") }, leadingIcon = { Icon(Icons.Outlined.SystemUpdate, null) },
+                    onClick = { menu = false; onCheckUpdates() })
+            }
+        }
     }
 }
 

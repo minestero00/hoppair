@@ -5,6 +5,7 @@ import Carbon
 @main
 struct HoppairApp: App {
     @StateObject private var model = AppModel()
+    @StateObject private var updater = AppUpdater()
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     var body: some Scene {
         WindowGroup("Hoppair", id: "shelf") {
@@ -13,6 +14,7 @@ struct HoppairApp: App {
         .defaultSize(width: 1100, height: 740)
         .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
+            CommandGroup(after: .appInfo) { CheckForUpdatesButton(updater: updater) }
             CommandGroup(after: .newItem) {
                 Button("Open Commands") { model.openCommands(); delegate.reveal() }.keyboardShortcut("k")
                 Button("Add File…") { model.chooseFiles() }.keyboardShortcut("o")
@@ -28,6 +30,7 @@ struct HoppairApp: App {
             Button("Take a Photo") { model.requestCamera(); delegate.reveal() }
             Divider()
             Button("Connect Phone") { model.showPairing = true; delegate.reveal() }
+            CheckForUpdatesButton(updater: updater)
             Button("Quit") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
         }
     }

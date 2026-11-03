@@ -15,4 +15,12 @@ cd "$ROOT/services/relay"
 npm ci
 npm run check
 npx wrangler deploy --dry-run
-npx wrangler deploy --var "ROOM_CREDENTIALS:$ROOM_CONFIG"
+DEPLOY_ARGS=(deploy)
+if [[ -n "${HOPPAIR_RELAY_WORKER_NAME:-}" ]]; then
+    if [[ ! "$HOPPAIR_RELAY_WORKER_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo 'Use an existing Worker name with lowercase letters, numbers, and hyphens.' >&2
+        exit 1
+    fi
+    DEPLOY_ARGS+=(--name "$HOPPAIR_RELAY_WORKER_NAME")
+fi
+npx wrangler "${DEPLOY_ARGS[@]}" --var "ROOM_CREDENTIALS:$ROOM_CONFIG"

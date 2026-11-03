@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SIGNING_IDENTITY="${HOPPAIR_SIGN_IDENTITY:-${MACDROID_SIGN_IDENTITY:--}}"
 OUTPUT_DIR="${HOPPAIR_OUTPUT_DIR:-$ROOT/dist}"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
@@ -38,14 +39,30 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleName</key><string>Hoppair</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.5</string>
-<key>CFBundleVersion</key><string>12</string>
+<key>CFBundleShortVersionString</key><string>0.1.6</string>
+<key>CFBundleVersion</key><string>14</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSLocalNetworkUsageDescription</key><string>Exchange files, text, and photo requests with your Android device.</string>
 </dict></plist>
 PLIST
+python3 - "$ROOT" "$APP" "$SIGNING_IDENTITY" <<'PYCODE'
+import base64,os,plistlib,sys
+from pathlib import Path
+root,app=map(Path,sys.argv[1:3])
+key_file=Path(os.environ.get('HOPPAIR_UPDATE_PUBLIC_KEY_FILE',str(root/'config/update-public-key.txt')))
+key=key_file.read_text().strip()
+if len(base64.b64decode(key,validate=True)) != 32: raise SystemExit('Expected a 32-byte public update key.')
+path=app/'Contents/Info.plist'
+info=plistlib.loads(path.read_bytes())
+info.update(SUFeedURL=os.environ.get('HOPPAIR_UPDATE_FEED_URL','https://minestero00.github.io/hoppair/appcast.xml'),
+            SUPublicEDKey=key,SUEnableAutomaticChecks=True,SUAutomaticallyUpdate=False,
+            SUScheduledCheckInterval=3600,SURequireSignedFeed=True,SUVerifyUpdateBeforeExtraction=True,
+            SUSignedFeedFailureExpirationInterval=0,
+            SUShowReleaseNotes=False,HoppairUpdateChecksEnabled=sys.argv[3]!='-')
+path.write_bytes(plistlib.dumps(info))
+PYCODE
 RELAY_URL="${HOPPAIR_RELAY_URL:-${MACDROID_RELAY_URL:-}}"
 if [[ -n "$RELAY_URL" ]]; then
     /usr/libexec/PlistBuddy -c "Add :HoppairRelayURL string $RELAY_URL" "$APP/Contents/Info.plist"
@@ -53,7 +70,7 @@ fi
 mkdir -p "$APP/Contents/Resources/Licenses"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/Licenses/MIT.txt"
 cp "$ROOT/NOTICE" "$APP/Contents/Resources/Licenses/NOTICE.txt"
-SIGNING_IDENTITY="${HOPPAIR_SIGN_IDENTITY:-${MACDROID_SIGN_IDENTITY:--}}"
+python3 "$ROOT/scripts/embed-sparkle.py" "$APP" "$SIGNING_IDENTITY"
 if [[ "$SIGNING_IDENTITY" == - ]]; then
     codesign --force --sign - "$APP"
 else

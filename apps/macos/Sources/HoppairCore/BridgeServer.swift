@@ -5,14 +5,19 @@ public final class BridgeServer {
     private var listener: NWListener?
     private var connections: [UUID: NWConnection] = [:]
     private var timers: [UUID: DispatchWorkItem] = [:]
+    private let requestGuard: RequestReplayGuard
     private let key: Data
     public var handler: ((BridgeRequest) -> BridgeResponse)?
     public var onState: ((String) -> Void)?
     public var onPort: ((UInt16) -> Void)?
     private let loopbackOnly: Bool
     private let port: UInt16
-    public init(key: Data, port: UInt16 = 49271, loopbackOnly: Bool = false) { self.key = key; self.port = port; self.loopbackOnly = loopbackOnly }
+    public init(key: Data, port: UInt16 = 49271, loopbackOnly: Bool = false, requestGuard: RequestReplayGuard = RequestReplayGuard()) {
+        self.key = key; self.port = port; self.loopbackOnly = loopbackOnly; self.requestGuard = requestGuard
+    }
     public func start() throws {
+        guard key.count == 32 else { throw BridgeError.invalid("Invalid pairing key.") }
+        stop()
         let parameters = NWParameters.tcp
         if loopbackOnly { parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port)!) }
         let listener = try loopbackOnly ? NWListener(using: parameters) : NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
@@ -26,7 +31,10 @@ public final class BridgeServer {
             default: break
             }
         }
-        listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
+        listener.newConnectionHandler = { [weak self, weak listener] connection in
+            guard let self, let listener, self.listener === listener else { connection.cancel(); return }
+            self.accept(connection)
+        }
         listener.start(queue: .main)
     }
     public func stop() {
@@ -46,16 +54,18 @@ public final class BridgeServer {
         DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: timer)
         connection.start(queue: .main)
         read(connection, count: 4, accumulated: Data()) { [weak self] header in
-            guard let self, let header, let length = try? Wire.length(header) else { self?.finish(id); return }
+            guard let self, self.connections[id] === connection, let header, let length = try? Wire.length(header) else { self?.finish(id); return }
             self.read(connection, count: length, accumulated: Data()) { [weak self] body in
-                guard let self, let body else { self?.finish(id); return }
+                guard let self, self.connections[id] === connection, let body else { self?.finish(id); return }
                 do {
                     let plain = try Wire.open(body, key: self.key)
                     let request = try JSONDecoder().decode(BridgeRequest.self, from: plain)
-                    guard request.version == 1, abs(Date().timeIntervalSince1970 - request.issuedAt) <= 60 else {
-                        self.finish(id); return
-                    }
-                    let response = self.handler?(request) ?? BridgeResponse(ok: false, error: "Not ready yet.")
+                    var response: BridgeResponse
+                    do {
+                        try self.requestGuard.admit(request)
+                        response = self.handler?(request) ?? BridgeResponse(ok: false, error: "Not ready yet.")
+                    } catch { response = BridgeResponse(ok: false, error: error.localizedDescription) }
+                    response.requestId = request.requestId
                     let payload = try Wire.frame(Wire.seal(JSONEncoder().encode(response), key: self.key))
                     connection.send(content: payload, completion: .contentProcessed { [weak self] _ in self?.finish(id) })
                 } catch { self.finish(id) }

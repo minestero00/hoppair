@@ -37,9 +37,13 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 
 @Composable
-internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera: () -> Unit,
+internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, onInstallUpdate: () -> Unit, onFiles: () -> Unit, onCamera: () -> Unit,
     onCopy: (String) -> Unit, onOpen: (ShelfEntry) -> Unit) {
     val state by model.ui.collectAsStateWithLifecycle()
+    val updateState by updater.ui.collectAsStateWithLifecycle()
+    LaunchedEffect(updateState.stage, updateState.installRequested) {
+        if (updateState.stage == UpdateStage.READY && updateState.installRequested) onInstallUpdate()
+    }
     var pairing by rememberSaveable { mutableStateOf(false) }
     var manual by rememberSaveable { mutableStateOf(false) }
     var link by rememberSaveable { mutableStateOf("") }
@@ -84,7 +88,7 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
             topBar = {
                 Column {
                     ShelfToolbar(searching, showComposer, hazeState,
-                        onSearch = { if (searching) closeSearch() else searching = true }, onConnection = { pairing = true })
+                        onSearch = { if (searching) closeSearch() else searching = true }, onConnection = { pairing = true }, onCheckUpdates = { updater.check() })
                     if (searching && showComposer) {
                         LaunchedEffect(Unit) { searchFocus.requestFocus() }
                         Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -117,6 +121,9 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
                 LazyColumn(contentWidth, contentPadding = PaddingValues(start = gutter, end = gutter,
                     top = padding.calculateTopPadding() + 12.dp, bottom = padding.calculateBottomPadding() + 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (updateState.release != null && updateState.stage !in setOf(UpdateStage.IDLE, UpdateStage.CURRENT, UpdateStage.CHECKING)) {
+                        item { UpdateBanner(updateState, onOpen = updater::show) }
+                    }
                     if (!state.paired && !searching) {
                         item { WelcomePanel(state.busy, onScan = scan, onManual = { manual = true; pairing = true }) }
                     } else if (state.paired && !searching) {
@@ -159,6 +166,8 @@ internal fun HoppairScreen(model: ShelfViewModel, onFiles: () -> Unit, onCamera:
                 }
             }
         }
+        if (updateState.sheet) UpdateSheet(updateState, onCheck = { updater.check() }, onUpdate = updater::update,
+            onCancel = { updater.cancel() }, onDismiss = updater::dismiss)
         if (pairing) ConnectionSheet(state, manual, link, { link = it }, onManual = { manual = !manual }, onScan = scan,
             onPair = { model.pair(link) { pairing = false; link = "" } }, onDismiss = { pairing = false })
         if (attachments) AttachmentSheet(

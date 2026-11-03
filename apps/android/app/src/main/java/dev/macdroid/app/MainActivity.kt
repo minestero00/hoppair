@@ -29,6 +29,13 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val model: ShelfViewModel by viewModels()
+    private val updater: AppUpdateViewModel by viewModels()
+    private val installUpdate = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        updater.installerReturned(result.resultCode == RESULT_OK)
+    }
+    private val allowUpdateInstall = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        updater.permissionReturned(packageManager.canRequestPackageInstalls())
+    }
     private var cameraUri: Uri? = null
     private data class PairingInvite(val link: String, val host: String, val relayHost: String?)
     private var pairingInvite by mutableStateOf<PairingInvite?>(null)
@@ -46,7 +53,7 @@ class MainActivity : ComponentActivity() {
         cameraUri = savedInstanceState?.getString("cameraUri")?.let(Uri::parse)
         enableEdgeToEdge()
         setContent {
-            HoppairScreen(model, onFiles = { pickFiles.launch(arrayOf("*/*")) }, onCamera = ::takePhoto,
+            HoppairScreen(model, updater, onInstallUpdate = ::launchVerifiedUpdate, onFiles = { pickFiles.launch(arrayOf("*/*")) }, onCamera = ::takePhoto,
                 onCopy = { text -> getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Hoppair", text)) }, onOpen = ::openEntry)
             pairingInvite?.let { invite ->
                 HoppairTheme {
@@ -62,6 +69,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) receiveShare(intent)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { while (isActive) { updater.check(manual = false); delay(60_000) } }
                 while (isActive) { model.sync(); delay(3000) }
             }
         }
@@ -82,12 +90,43 @@ class MainActivity : ComponentActivity() {
         }
     }
     private fun receiveShare(intent: Intent) {
-        if (intent.action == Intent.ACTION_SEND) {
-            val uri = androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
-            if (uri != null) model.addFiles(listOf(uri)) else intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.let { model.addText(it) }
-        } else if (intent.action == Intent.ACTION_SEND_MULTIPLE) {
-            androidx.core.content.IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let(model::addFiles)
+        try {
+            val uris = when (intent.action) {
+                Intent.ACTION_SEND -> listOfNotNull(androidx.core.content.IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+                Intent.ACTION_SEND_MULTIPLE -> androidx.core.content.IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+                else -> return
+            }
+            if (uris.isNotEmpty()) {
+                require(uris.size <= MAX_SHELF_ITEMS && uris.all { externalShareAllowed(it, packageName) }) { "Share up to 500 files from another app’s content provider." }
+                model.addFiles(uris)
+            } else if (intent.action == Intent.ACTION_SEND) {
+                intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.let { text ->
+                    require(text.length <= 64 * 1024) { "Text must be 64 KiB or smaller." }
+                    val value = text.toString()
+                    require(value.toByteArray(Charsets.UTF_8).size <= 64 * 1024) { "Text must be 64 KiB or smaller." }
+                    model.addText(value)
+                }
+            }
+        } catch (error: Exception) {
+            android.widget.Toast.makeText(this, error.message?.take(160) ?: "Could not read this shared item.", android.widget.Toast.LENGTH_LONG).show()
         }
+    }
+    private fun launchVerifiedUpdate() {
+        val file = updater.consumeInstallRequest() ?: return
+        try {
+            if (!packageManager.canRequestPackageInstalls()) {
+                updater.permissionRequired()
+                allowUpdateInstall.launch(Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                return
+            }
+            require(file.isFile) { "The update file is no longer available." }
+            val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+            updater.installerStarted()
+            @Suppress("DEPRECATION")
+            val installer = Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            installUpdate.launch(installer)
+        } catch (_: Exception) { updater.installationFailed() }
     }
     private fun takePhoto() {
         if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -122,3 +161,7 @@ class MainActivity : ComponentActivity() {
 
 /** Keep QR scanning in the user's current orientation. */
 class QrScannerActivity : com.journeyapps.barcodescanner.CaptureActivity()
+
+/** External intents never borrow Hoppair's own private FileProvider privileges. */
+internal fun externalShareAllowed(uri: Uri, packageName: String): Boolean = uri.scheme == "content" && !uri.authority.isNullOrBlank() &&
+    !uri.authority!!.substringAfterLast('@').equals("$packageName.files", ignoreCase = true)

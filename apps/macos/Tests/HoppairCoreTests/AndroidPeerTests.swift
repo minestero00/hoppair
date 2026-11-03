@@ -18,7 +18,10 @@ final class AndroidPeerTests: XCTestCase {
         let handler: (BridgeRequest) -> BridgeResponse = { request in
             do {
                 switch request.action {
-                case "list": return BridgeResponse(items: store.items)
+                case "list": return try store.legacyList()
+                case "listPage":
+                    let page = try store.page(after: request.id)
+                    return BridgeResponse(items: page.items, nextCursor: page.nextCursor)
                 case "get": return BridgeResponse(data: try store.content(request.id!).base64EncodedString())
                 case "put":
                     let item = request.item!

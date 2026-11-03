@@ -7,5 +7,5 @@
   "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "DeviceRoom" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DeviceRoom"] }],
   "vars": { "ROOM_CREDENTIALS": "{}" },
-  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+  "observability": { "enabled": true, "head_sampling_rate": 0.1, "logs": { "invocation_logs": false } }
 }

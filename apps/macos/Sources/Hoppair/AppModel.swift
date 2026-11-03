@@ -21,6 +21,7 @@ final class AppModel: ObservableObject {
     private var store: ShelfStore?
     private var server: BridgeServer?
     private var relayHost: RelayHost?
+    private let requestGuard = RequestReplayGuard()
     @Published var relayAddress = UserDefaults.standard.string(forKey: "relayAddress") ?? (Bundle.main.object(forInfoDictionaryKey: "HoppairRelayURL") as? String ?? Bundle.main.object(forInfoDictionaryKey: "MacDroidRelayURL") as? String ?? "")
     @Published var relayConnected = false
     private var key = Data()
@@ -64,7 +65,7 @@ final class AppModel: ObservableObject {
     private func startConnections() async {
         do {
             key = try await Task.detached(priority: .userInitiated) { try AppModel.loadKey() }.value
-            let server = BridgeServer(key: key)
+            let server = BridgeServer(key: key, requestGuard: requestGuard)
             self.server = server
             server.handler = { [weak self] request in self?.handle(request) ?? BridgeResponse(ok: false) }
             server.onState = { [weak self] state in self?.message = state }
@@ -103,7 +104,7 @@ final class AppModel: ObservableObject {
         do {
             _ = try RelayIdentity.endpoint(base: address, key: key, role: "host")
             relayHost?.stop(); relayHost = nil
-            let host = RelayHost(base: address, key: key) { [weak self] request in self?.handle(request) ?? BridgeResponse(ok: false) }
+            let host = RelayHost(base: address, key: key, requestGuard: requestGuard) { [weak self] request in self?.handle(request) ?? BridgeResponse(ok: false) }
             host.onState = { [weak self] connected in self?.relayConnected = connected }
             relayHost = host; try host.start()
             relayAddress = address; UserDefaults.standard.set(address, forKey: "relayAddress")
@@ -120,12 +121,18 @@ final class AppModel: ObservableObject {
         do {
             guard let store else { throw BridgeError.invalid("Could not open local storage.") }
             switch request.action {
-            case "list": return BridgeResponse(items: store.items, cameraRequest: cameraRequest)
+            case "list": return try store.legacyList(cameraRequest: cameraRequest)
+            case "listPage":
+                let page = try store.page(after: request.id)
+                return BridgeResponse(items: page.items, cameraRequest: cameraRequest, nextCursor: page.nextCursor)
             case "put":
                 guard var item = request.item else { throw BridgeError.invalid("Item is missing.") }
                 item.source = "Android"; item.pinned = false
                 let data: Data?
                 if let encoded = request.data {
+                    guard item.kind == "file", encoded.utf8.count <= 4 * ((Wire.maxFileSize + 2) / 3) else {
+                        throw BridgeError.invalid("File data must be 8 MiB or smaller and belong to a file item.")
+                    }
                     guard let decoded = Data(base64Encoded: encoded) else { throw BridgeError.invalid("Invalid file data.") }
                     data = decoded
                 } else { data = nil }
@@ -145,8 +152,7 @@ final class AppModel: ObservableObject {
     func addText(_ text: String) {
         let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return }
-        let scheme = URL(string: value)?.scheme?.lowercased() ?? ""
-        let link = ["http", "https"].contains(scheme) && !value.contains("\n")
+        let link = WebLink.isValid(value)
         perform {
             try store?.put(ShelfItem(kind: link ? "link" : "text", title: String(value.prefix(90)), text: value))
             message = "Added to the shelf · your phone will receive it when connected"

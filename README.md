@@ -10,6 +10,7 @@ A native macOS + Android companion for sharing files, links, notes, and phone ph
 - Share through a persistent shelf, Android's share menu, and Mac drag and drop.
 - Use the Mac menu bar and command palette; request a photo from your phone.
 - Transfer directly nearby, or use an encrypted relay when networks change.
+- Check for signed app updates without replacing your shelf or pairing.
 
 Previously published here as MacDroid. Existing installations can [update without re-pairing](docs/install.md#updating-from-macdroid).
 
@@ -17,7 +18,7 @@ Previously published here as MacDroid. Existing installations can [update withou
 
 [Website and app screenshots](https://minestero00.github.io/hoppair/)
 
-[Download apps](https://github.com/minestero00/hoppair/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md)
+[Download apps](https://github.com/minestero00/hoppair/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md) · [Security](docs/security.md)
 
 ## Repository
 

@@ -10,6 +10,7 @@ private final class LoopbackRelay {
     var connections: [NWConnection] = []
     var pings = 0
     var onAccept: (() -> Void)?
+    var onData: ((Data, NWConnection) -> Void)?
 
     init(webSocket: Bool = true, stallFirstHandshake: Bool = false) throws {
         let parameters = NWParameters.tcp
@@ -44,9 +45,15 @@ private final class LoopbackRelay {
                     let pong = NWConnection.ContentContext(identifier: "pong", metadata: [NWProtocolWebSocket.Metadata(opcode: .pong)])
                     connection.send(content: data ?? Data(), contentContext: pong, completion: .contentProcessed { _ in })
                 }
+                if metadata.opcode == .binary, let data { self.onData?(data, connection) }
                 self.receive(connection)
             }
         }
+    }
+
+    func send(_ data: Data, on connection: NWConnection) {
+        let context = NWConnection.ContentContext(identifier: UUID().uuidString, metadata: [NWProtocolWebSocket.Metadata(opcode: .binary)])
+        connection.send(content: data, contentContext: context, isComplete: true, completion: .contentProcessed { _ in })
     }
 
     func start() async throws -> String {
@@ -67,6 +74,46 @@ private final class LoopbackRelay {
 }
 
 final class RelayHostTests: XCTestCase {
+    @MainActor
+    func testRelayRejectsReplayWithCorrelatedResponseWithoutRepeatingHandler() async throws {
+        let server = try LoopbackRelay()
+        defer { server.stop() }
+        let key = Data(repeating: 7, count: 32)
+        let replayGuard = RequestReplayGuard()
+        var calls = 0
+        let host = RelayHost(base: try await server.start(), key: key, requestGuard: replayGuard) { _ in
+            calls += 1
+            return BridgeResponse()
+        }
+        defer { host.stop() }
+        let request = BridgeRequest(action: "cameraAck", id: UUID().uuidString)
+        let encrypted = try Wire.seal(JSONEncoder().encode(request), key: key)
+        let done = expectation(description: "replayed request rejected")
+        var responses = 0
+        server.onData = { data, connection in
+            do {
+                let response = try JSONDecoder().decode(BridgeResponse.self, from: Wire.open(data, key: key))
+                XCTAssertEqual(response.requestId, request.requestId)
+                responses += 1
+                if responses == 1 {
+                    XCTAssertTrue(response.ok)
+                    server.send(encrypted, on: connection)
+                } else {
+                    XCTAssertFalse(response.ok)
+                    XCTAssertTrue(response.error?.contains("already received") == true)
+                    done.fulfill()
+                }
+            } catch { XCTFail("\(error)"); done.fulfill() }
+        }
+        host.onState = { connected in
+            if connected, let connection = server.connections.last { server.send(encrypted, on: connection) }
+        }
+        try host.start()
+        await fulfillment(of: [done], timeout: 5)
+        XCTAssertEqual(responses, 2)
+        XCTAssertEqual(calls, 1)
+    }
+
     @MainActor
     func testReconnectsAfterRepeatedDisconnectsAndKeepsHeartbeatAlive() async throws {
         let server = try LoopbackRelay()

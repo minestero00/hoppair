@@ -29,7 +29,7 @@ The script builds the APK and runs unit tests and lint. Open `apps/android/` in 
 
 ## Relay
 
-Requires Node.js 22 or later.
+Requires Node.js 22.13 or later.
 
 ```bash
 cd services/relay
@@ -63,7 +63,7 @@ After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately i
 ## Package a release
 
 ```bash
-./scripts/package-release.sh 0.1.5
+./scripts/package-release.sh 0.1.6
 ```
 
 Existing MacDroid signing configurations are reused automatically; do not generate a replacement key for an existing installation. `MACDROID_*` signing/build environment variables remain accepted as fallbacks.
@@ -86,10 +86,12 @@ For command-line packaging, use an existing `notarytool` Keychain profile:
 ```bash
 HOPPAIR_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 HOPPAIR_NOTARY_PROFILE=hoppair-notary \
-./scripts/package-release.sh 0.1.5
+./scripts/package-release.sh 0.1.6
 ```
 
 Create the profile yourself with `xcrun notarytool store-credentials hoppair-notary`; credentials stay outside Git. The packaging script enables hardened runtime, waits for notarization, staples the ticket, and then archives the app.
+
+Prepare signed update feeds only from final notarized/signed artifacts. See [updates.md](updates.md) for key setup, validation, and publishing order.
 
 ## Website
 

@@ -6,3 +6,8 @@ Other dependencies retain their respective licenses and notices.
 
 Android backdrop blur uses Haze, copyright Christopher Banes and contributors,
 licensed under Apache License 2.0; see licenses/Apache-2.0.txt.
+
+Android bounded WebSocket transport uses Java-WebSocket, copyright 2010-2020
+Nathan Rajlich and contributors, licensed under MIT; see licenses/Java-WebSocket.txt.
+SLF4J's API and no-operation logging provider are licensed under MIT; see
+licenses/SLF4J.txt. The no-operation provider prevents transport debug logging.
