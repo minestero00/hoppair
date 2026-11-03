@@ -87,6 +87,44 @@ class ShelfUiTest {
             compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()
             waitText("Connected to Studio Mac")
             assertArrayEquals(Pairing.parse(checkNotNull(originalPairing)).key, Pairing.parse(checkNotNull(PairingVault(context).load())).key)
+            // A scanned invite can parse correctly while its peer drops the connection.
+            // Exercise the real intent, confirmation and error dialog without replacing saved pairing.
+            val savedBeforeFailure = PairingVault(context).load()
+            java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).use { rejectingPeer ->
+                rejectingPeer.soTimeout = 60_000
+                val accepted = java.util.concurrent.CompletableFuture<Boolean>()
+                val peer = Thread {
+                    try { rejectingPeer.accept().use { socket ->
+                        socket.soTimeout = 15_000
+                        val input = java.io.DataInputStream(socket.getInputStream())
+                        val length = input.readInt()
+                        check(length in 28..65536)
+                        input.readFully(ByteArray(length))
+                        // Consume the request before closing, ensuring EOF rather than a write/reset race.
+                        accepted.complete(true)
+                    } }
+                    catch (error: Exception) { accepted.completeExceptionally(error) }
+                }.apply { start() }
+                try {
+                    val failedLink = "hoppair://127.0.0.1:${rejectingPeer.localPort}?key=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+                    val failedInvite = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(failedLink))
+                        .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    scenario.onActivity { it.startActivity(failedInvite) }
+                    waitText("Connect to your Mac?")
+                    compose.onNodeWithText("Connect", substring = false).performClick()
+                    waitText("Something needs your attention")
+                    assertTrue(accepted.get(1, java.util.concurrent.TimeUnit.SECONDS))
+                    compose.onNodeWithText("Connection interrupted. Try connecting again.").assertIsDisplayed()
+                    assertEquals(savedBeforeFailure, PairingVault(context).load())
+                    screenshot(screenshots, "pairing-failed")
+                    tapText("OK")
+                    compose.onNodeWithText("Something needs your attention").assertDoesNotExist()
+                    waitText("Connected to Studio Mac")
+                } finally {
+                    rejectingPeer.close()
+                    peer.join(2_000)
+                }
+            }
             val replacementLink = "hoppair://10.0.2.2:49273?key=" + android.util.Base64.encodeToString(ByteArray(32) { 8 }, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
             val replacementIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(replacementLink))
                 .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
