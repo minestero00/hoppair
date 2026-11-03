@@ -62,6 +62,9 @@ internal data class ShelfEntry(val json: JSONObject, val pending: Boolean = fals
     val pinned: Boolean get() = json.optBoolean("pinned")
 }
 
+internal data class ShelfMergeResult(val unavailableFiles: Int, val interruption: java.io.IOException?, val capacityLimited: Int)
+internal data class ShelfUploadResult(val rejectedItems: Int, val missingFiles: Int, val rejection: PeerRejected?)
+
 /** Called on one IO coroutine under the ViewModel's mutex. */
 internal class ShelfRepository(private val context: Context) {
     private val root = File(context.filesDir, "shelf").apply { mkdirs() }
@@ -185,32 +188,64 @@ internal class ShelfRepository(private val context: Context) {
         catch (error: Exception) { AtomicFile(file(json.getString("id"))).delete(); throw error }
     }
     fun acknowledge(id: String) { commit(entries.map { if (it.id == id) it.copy(pending = false) else it }) }
-    fun merge(remote: JSONArray, client: BridgeClient) = merge(remote) { id ->
-        val encoded = client.call("get", id = id).getString("data")
-        require(encoded.length <= 4 * ((MAX_FILE + 2) / 3) && encoded.matches(Regex("[A-Za-z0-9+/]*={0,2}"))) { "Invalid file data." }
-        android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
-    }
-    internal fun merge(remote: JSONArray, fetch: (String) -> ByteArray) {
+    /** Validate peer metadata before either upload acknowledgements or downloads mutate storage. */
+    fun validateSnapshot(remote: JSONArray): List<ShelfEntry> {
         require(remote.length() <= MAX_SHELF_ITEMS) { "The shelf can hold up to 500 items." }
         val seen = mutableSetOf<String>()
-        // Validate the complete snapshot before any file is downloaded or local state changes.
-        val incoming = (0 until remote.length()).map { i ->
+        return (0 until remote.length()).map { i ->
             ShelfEntry(validatedShelfItem(remote.getJSONObject(i))).also {
                 require(seen.add(it.id)) { "Duplicate shelf item." }
             }
         }
+    }
+    fun uploadPending(send: (ShelfEntry, ByteArray?) -> Unit): ShelfUploadResult {
+        var rejected = 0
+        var missing = 0
+        var rejection: PeerRejected? = null
+        for (entry in entries.filter { it.pending }) {
+            val bytes = if (entry.kind == "file") {
+                val source = file(entry.id)
+                if (!source.isFile || source.length() != entry.size.toLong()) { missing++; continue }
+                val content = try { source.inputStream().use { it.readBytesBounded(MAX_FILE) } }
+                catch (_: java.io.IOException) { missing++; continue }
+                catch (_: IllegalArgumentException) { missing++; continue }
+                if (content.size != entry.size) { missing++; continue }
+                content
+            } else null
+            try { send(entry, bytes) }
+            catch (error: PeerRejected) { rejected++; rejection = error; continue }
+            // Transport, verification, and persistence failures are not per-item rejections.
+            acknowledge(entry.id)
+        }
+        return ShelfUploadResult(rejected, missing, rejection)
+    }
+    fun merge(incoming: List<ShelfEntry>, client: BridgeClient) = mergePrepared(incoming) { id ->
+        val encoded = client.call("get", id = id).getString("data")
+        require(encoded.length <= 4 * ((MAX_FILE + 2) / 3) && encoded.matches(Regex("[A-Za-z0-9+/]*={0,2}"))) { "Invalid file data." }
+        android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+    }
+    internal fun merge(remote: JSONArray, fetch: (String) -> ByteArray): ShelfMergeResult = mergePrepared(validateSnapshot(remote), fetch)
+    private fun mergePrepared(incoming: List<ShelfEntry>, fetch: (String) -> ByteArray): ShelfMergeResult {
         val next = entries.toMutableList()
-        require((entries.map { it.id } + incoming.map { it.id }).toSet().size <= MAX_SHELF_ITEMS) { "The shelf can hold up to 500 items." }
         val downloaded = mutableListOf<File>()
+        var unavailableFiles = 0
+        var capacityLimited = 0
+        var interruption: java.io.IOException? = null
         try {
             for (entry in incoming) {
                 val existing = next.indexOfFirst { it.id == entry.id }
+                if (existing < 0 && next.size >= MAX_SHELF_ITEMS) { capacityLimited++; continue }
                 // A remote UUID collision must not discard a locally queued item before its put is acknowledged.
                 if (existing >= 0 && next[existing].pending) continue
                 if (entry.kind == "file") {
                     val stored = file(entry.id)
                     if (!stored.exists()) {
-                        val bytes = fetch(entry.id)
+                        // A missing file must not hide unrelated notes or block the outbox.
+                        // Stop requesting more files after a transport failure in this pass.
+                        if (interruption != null) { unavailableFiles++; continue }
+                        val bytes = try { fetch(entry.id) }
+                        catch (_: PeerRejected) { unavailableFiles++; continue }
+                        catch (error: java.io.IOException) { unavailableFiles++; interruption = error; continue }
                         require(bytes.size == entry.size) { "The downloaded file does not match its declared size." }
                         storeFile(entry.id, bytes)
                         downloaded.add(stored)
@@ -219,6 +254,7 @@ internal class ShelfRepository(private val context: Context) {
                 if (existing >= 0) next[existing] = entry else next.add(entry)
             }
             commit(next.sortedByDescending { it.json.getDouble("createdAt") })
+            return ShelfMergeResult(unavailableFiles, interruption, capacityLimited)
         } catch (error: Exception) {
             // Failed snapshots must not leave unindexed files that accumulate across retries.
             downloaded.forEach { AtomicFile(it).delete() }

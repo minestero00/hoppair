@@ -121,20 +121,31 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
                     val syncContext = currentCoroutineContext()
                     client.setCancellationCheck { syncContext.ensureActive() }
                     val response = client.call("list")
-                    repo.merge(response.getJSONArray("items"), client)
-                    var rejected: String? = null
-                    for (entry in repo.entries.filter { it.pending }) {
-                        try {
-                            val bytes = if (entry.kind == "file") repo.file(entry.id).readBytes() else null
-                            client.call("put", entry.json, bytes)
-                            repo.acknowledge(entry.id)
-                        } catch (error: PeerRejected) { rejected = friendly(error); break }
+                    val incoming = repo.validateSnapshot(response.getJSONArray("items"))
+                    val queuedAtSnapshot = repo.entries.filter { it.pending }.map { it.id }.toSet()
+                    // Send local changes before downloads so one unavailable remote file cannot starve them.
+                    val uploads = repo.uploadPending { entry, bytes -> client.call("put", entry.json, bytes) }
+                    // The snapshot predates these acknowledgements; do not replace just-sent
+                    // content with its older peer copy during this pass.
+                    val received = repo.merge(incoming.filterNot { it.id in queuedAtSnapshot }, client)
+                    state.update { it.copy(entries = repo.entries) }
+                    received.interruption?.let { throw it }
+                    val unavailableFiles = received.unavailableFiles
+                    val rejected = when {
+                        uploads.missingFiles > 0 -> "${uploads.missingFiles} queued ${if (uploads.missingFiles == 1) "file is" else "files are"} unavailable on this phone. Other items can still sync."
+                        uploads.rejectedItems > 0 -> "${uploads.rejectedItems} ${if (uploads.rejectedItems == 1) "item is" else "items are"} waiting to send. ${friendly(checkNotNull(uploads.rejection))}"
+                        else -> null
                     }
                     val peerName = cleanDeviceName(response.optString("deviceName", "Mac")).trim().ifBlank { "Mac" }
                     if (response.optBoolean("syncAcknowledgement", false)) client.call("syncAck", deviceName = ownName())
                     if (peerName != state.value.peerName) preferences.edit().putString("peer", peerName).apply()
                     val camera = if (response.isNull("cameraRequest")) null else response.optString("cameraRequest").takeIf { it.isNotEmpty() }
-                    state.update { it.copy(entries = repo.entries, online = true, peerName = peerName, status = rejected ?: "Everything is up to date", cameraRequest = camera) }
+                    val transferStatus = if (received.capacityLimited > 0)
+                        "This phone’s shelf is full. ${received.capacityLimited} more items are waiting on your Mac."
+                        else if (unavailableFiles > 0)
+                        "$unavailableFiles ${if (unavailableFiles == 1) "file is" else "files are"} waiting to download. Other items can still sync. Retrying automatically."
+                        else "Everything is up to date"
+                    state.update { it.copy(entries = repo.entries, online = true, peerName = peerName, status = rejected ?: transferStatus, cameraRequest = camera) }
                 } catch (error: Exception) {
                     closeConnection()
                     if (error is CancellationException) throw error
