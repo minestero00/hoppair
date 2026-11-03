@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
@@ -64,6 +65,7 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
     val copy: (String) -> Unit = { text -> onCopy(text); scope.launch { snackbar.showSnackbar("Copied") } }
     val closeSearch: () -> Unit = { searching = false; search = ""; focusManager.clearFocus(); keyboard?.hide() }
     val showComposer = state.paired || state.entries.isNotEmpty()
+    val results = rememberShelfSearch(state.entries, search, filter)
     LaunchedEffect(state.entries, selectedId) {
         if (selectedId != null && state.entries.none { it.id == selectedId }) selectedId = null
     }
@@ -130,7 +132,7 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
                     }
                     if (!state.paired && !searching) {
                         item { WelcomePanel(state.busy, onScan = scan, onManual = { manual = true; pairing = true }) }
-                    } else if (state.paired && !searching) {
+                    } else if (state.paired && !searching && !compact) {
                         item {
                             Row(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text("Your shelf", style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
@@ -139,7 +141,7 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
                                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (!compact) item { ConnectionCard(state, onClick = { pairing = true }) }
+                        item { ConnectionCard(state, onClick = { pairing = true }) }
                     }
                     if (state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                     state.cameraRequest?.let {
@@ -156,11 +158,11 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
                     }
                     if (state.paired || state.entries.isNotEmpty()) {
                         item { ShelfFilters(filter, state.entries.count { it.pending }, onSelect = { filter = it }) }
-                        val visible = state.entries.filter { entry ->
-                            when (filter) { "Files" -> entry.kind == "file"; "Notes" -> entry.kind == "text"; "Links" -> entry.kind == "link"; "Waiting" -> entry.pending; else -> true } &&
-                                (search.isBlank() || (entry.title + " " + entry.text.orEmpty()).contains(search, ignoreCase = true))
-                        }.sortedByDescending { it.pinned }
-                        if (visible.isEmpty()) item {
+                        if (results.loading) item {
+                            LinearProgressIndicator(Modifier.fillMaxWidth().semantics { contentDescription = "Updating search results" })
+                        }
+                        val visible = results.entries
+                        if (results.ready && visible.isEmpty()) item {
                             EmptyShelf(search.isNotBlank() || filter != "All", filter == "Waiting" && search.isBlank() && state.entries.none { it.pending })
                         }
                         items(visible, key = { it.id }) { entry ->
