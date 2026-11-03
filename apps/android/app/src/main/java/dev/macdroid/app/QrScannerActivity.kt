@@ -5,11 +5,13 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Size
+import java.util.concurrent.Executors
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.CameraState
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.ImageAnalysis
@@ -54,6 +56,7 @@ class QrScannerActivity : ComponentActivity() {
     }
     private lateinit var controller: LifecycleCameraController
     private lateinit var scanner: BarcodeScanner
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
     private var observedCamera: CameraInfo? = null
     private var lastDetectionAt = 0L
     private val guidance = "Point at your Mac’s QR. Tap to focus or pinch to zoom."
@@ -74,7 +77,8 @@ class QrScannerActivity : ComponentActivity() {
             setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
             setImageAnalysisBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             imageAnalysisResolutionSelector = ResolutionSelector.Builder()
-                .setResolutionStrategy(ResolutionStrategy(Size(1280, 720), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
+                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                .setResolutionStrategy(ResolutionStrategy(Size(1920, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
                 .build()
             isTapToFocusEnabled = true
             isPinchToZoomEnabled = true
@@ -86,7 +90,8 @@ class QrScannerActivity : ComponentActivity() {
                 .setMaxSupportedZoomRatio(4f).build())
             .build())
         val executor = ContextCompat.getMainExecutor(this)
-        controller.setImageAnalysisAnalyzer(executor,
+        // Dispatch camera frames off Main; results and camera controls stay on Main.
+        controller.setImageAnalysisAnalyzer(analysisExecutor,
             MlKitAnalyzer(listOf(scanner), ImageAnalysis.COORDINATE_SYSTEM_ORIGINAL, executor) { result ->
                 if (destroyed || delivered || showPrivacy || isFinishing || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return@MlKitAnalyzer
                 if (result.getThrowable(scanner) != null) {
@@ -214,6 +219,7 @@ class QrScannerActivity : ComponentActivity() {
         controller.clearImageAnalysisAnalyzer()
         controller.unbind()
         scanner.close()
+        analysisExecutor.shutdown()
         super.onDestroy()
     }
 }
