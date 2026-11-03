@@ -22,7 +22,7 @@ Requires Android 9 or later. Release APKs use a dedicated signing key; no Play S
 2. On Mac, choose **Connect Phone** and scan its QR with your Android camera.
 3. If Hoppair is installed, open it and confirm the Mac. Otherwise, install the APK from the guide, return to that page, and choose **Open Hoppair**.
 
-You can also scan inside Hoppair with **Scan QR to connect**. This decodes the invite locally, without opening a website. Allow camera access when asked.
+You can also scan inside Hoppair with **Scan QR to connect**. This decodes the invite locally, without opening a website. Allow camera access when asked. Tap the preview to focus, pinch or use the zoom buttons for a small QR, and use the flashlight in dim light. The bundled scanner works without a model download. QR images and contents stay on your phone; Google ML Kit collects SDK performance and usage metrics ([privacy and terms](https://developers.google.com/ml-kit/terms)).
 
 A pairing link is available under **More connection options** if scanning is unavailable. Treat QR codes and pairing links as private credentials.
 

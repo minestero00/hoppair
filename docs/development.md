@@ -63,6 +63,8 @@ The first gate tests direct TCP. The second forces relay fallback with the direc
 
 Real-phone QR/camera, LTE, sleep/wake, permissions, accessibility, and battery behavior still require manual validation. Do not report emulator tests as hardware coverage.
 
+After installing the debug APK and test APK on a disposable emulator, run `adb -s emulator-5580 shell am instrument -w -e class dev.macdroid.app.QrScannerTest,dev.macdroid.app.QrScannerUiTest dev.macdroid.app.test/androidx.test.runner.AndroidJUnitRunner`. This checks the real bundled decoder against dense, rotated and off-center synthetic QR fixtures, rejects unrelated codes, and exercises scanner privacy/manual-link controls. It does not measure camera autofocus or optical performance on a phone.
+
 Run `./scripts/test-android-ui.sh emulator-5580` on a disposable emulator for the Android UI gate (Node.js 22+ required). It uses an isolated loopback shelf, checks search/details/attachments, and captures onboarding, light/dark themes, large text, landscape, and tablet layouts under `artifacts/android-ui/`.
 
 Run `python3 scripts/test-android-reconnect.py --serial emulator-5580` on a disposable emulator to verify saved pairing and automatic sync across two fresh app processes. It uses the same isolated fixture and does not scan a new QR code.

@@ -109,6 +109,25 @@ final class CoreTests: XCTestCase {
         try VNImageRequestHandler(cgImage: image).perform([request])
         XCTAssertEqual(request.results?.first?.payloadStringValue, value)
     }
+    func testDenseRelayQRCodeAtDisplayedSize() throws {
+        let direct = "hoppair://192.168.100.100:49271?key=" + String(repeating: "A", count: 43)
+            + "&relay=wss%3A%2F%2Fmacdroid-relay.macdroid-relay.workers.dev"
+        let link = PairingLink.webURL(for: direct)
+        let image = try XCTUnwrap(PairingCode.image(for: link))
+        let modules = image.width / 8
+        let size = modules * max(1, 288 / modules)
+        let context = try XCTUnwrap(CGContext(data: nil, width: size + 48, height: size + 48,
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue))
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: size + 48, height: size + 48))
+        context.interpolationQuality = .none
+        context.draw(image, in: CGRect(x: 24, y: 24, width: size, height: size))
+        let displayed = try XCTUnwrap(context.makeImage())
+        let request = VNDetectBarcodesRequest(); request.symbologies = [.qr]
+        try VNImageRequestHandler(cgImage: displayed).perform([request])
+        XCTAssertEqual(request.results?.first?.payloadStringValue, link)
+    }
     func testPairingQRCodeDecodesToOriginalLink() throws {
         let link = "hoppair://192.168.1.12:49271?key=fixture-key-with-url-safe-characters_1234567"
         let image = try XCTUnwrap(PairingCode.image(for: link))

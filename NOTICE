@@ -11,3 +11,11 @@ Android bounded WebSocket transport uses Java-WebSocket, copyright 2010-2020
 Nathan Rajlich and contributors, licensed under MIT; see licenses/Java-WebSocket.txt.
 SLF4J's API and no-operation logging provider are licensed under MIT; see
 licenses/SLF4J.txt. The no-operation provider prevents transport debug logging.
+
+Android QR scanning uses AndroidX CameraX (Apache License 2.0) and Google's
+bundled ML Kit barcode scanner, governed by the ML Kit and Google APIs terms:
+https://developers.google.com/ml-kit/terms
+https://developers.google.com/terms
+ML Kit processes images and decoded contents on-device. Google collects SDK
+performance and usage metrics; see https://policies.google.com/privacy.
+ZXing is used only in scanner tests and is licensed under Apache License 2.0.

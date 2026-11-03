@@ -97,8 +97,8 @@ struct PairingView: View {
             ProgressView("Preparing your connection").frame(width: 256, height: 256)
         } else if let image = qrImage {
             Image(nsImage: image).interpolation(.none).resizable().scaledToFit()
-                .frame(width: 224, height: 224)
-                .padding(16).background(.white, in: RoundedRectangle(cornerRadius: 16))
+                .frame(width: qrDisplaySize(image), height: qrDisplaySize(image))
+                .padding(24).background(.white, in: RoundedRectangle(cornerRadius: 16))
                 .accessibilityLabel("Pairing QR code for Hoppair on Android")
         } else {
             VStack(spacing: 14) {
@@ -177,6 +177,12 @@ struct PairingView: View {
         relayError = model.configureRelay(relayDraft)
         relayApplied = relayError == nil
         if relayApplied { relayDraft = model.relayAddress }
+    }
+
+    private func qrDisplaySize(_ image: NSImage) -> CGFloat {
+        // Core Image output is scaled by eight. Keep modules on whole points.
+        let modules = max(1, Int(image.size.width) / 8)
+        return CGFloat(modules * max(1, 288 / modules))
     }
 
     private var qrImage: NSImage? {

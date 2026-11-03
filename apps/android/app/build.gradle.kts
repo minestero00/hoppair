@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "dev.macdroid.app"
     compileSdk = 36
-    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 9; versionName = "0.1.8"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 10; versionName = "0.1.9"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     val signingPath = providers.environmentVariable("HOPPAIR_ANDROID_SIGNING_FILE").orNull
         ?: providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
     if (signingPath != null) {
@@ -27,7 +27,13 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.java-websocket:Java-WebSocket:1.6.0")
     runtimeOnly("org.slf4j:slf4j-nop:2.0.13")
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    val cameraVersion = "1.6.2"
+    implementation("androidx.camera:camera-camera2:$cameraVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
+    implementation("androidx.camera:camera-view:$cameraVersion")
+    implementation("androidx.camera:camera-mlkit-vision:$cameraVersion")
+    androidTestImplementation("com.google.zxing:core:3.5.3")
     implementation("dev.chrisbanes.haze:haze:1.6.10")
     val composeBom = platform("androidx.compose:compose-bom:2025.10.00")
     implementation(composeBom)

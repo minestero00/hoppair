@@ -160,9 +160,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** Keep QR scanning in the user's current orientation. */
-class QrScannerActivity : com.journeyapps.barcodescanner.CaptureActivity()
-
 /** External intents never borrow Hoppair's own private FileProvider privileges. */
 internal fun externalShareAllowed(uri: Uri, packageName: String): Boolean = uri.scheme == "content" && !uri.authority.isNullOrBlank() &&
     !uri.authority!!.substringAfterLast('@').equals("$packageName.files", ignoreCase = true)

@@ -58,8 +58,8 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
         if (error is CancellationException) throw error
         state.update { it.copy(error = friendly(error), busy = false) }
     }
-    private fun friendly(error: Exception): String = when (error) {
-        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (pairing?.relay != null) "Check the internet connection on both devices and open Hoppair. Reconnecting automatically." else "Open Hoppair on your Mac and use the same network. Reconnecting automatically."
+    private fun friendly(error: Exception, connection: Pairing? = pairing): String = when (error) {
+        is java.net.ConnectException, is java.net.SocketTimeoutException, is java.net.UnknownHostException, is java.net.NoRouteToHostException -> if (connection?.relay != null) "Check the internet connection on both devices and open Hoppair. Reconnecting automatically." else "Open Hoppair on your Mac and use the same network. Reconnecting automatically."
         is java.io.EOFException -> "Connection interrupted. Reconnecting automatically."
         is javax.crypto.AEADBadTagException -> "Could not verify this connection. Scan your Mac’s pairing QR code again."
         is java.net.URISyntaxException -> "Use a Hoppair pairing QR code or pairing link."
@@ -94,7 +94,12 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
     fun pair(link: String, onSuccess: () -> Unit = {}) = operation(onSuccess) {
         val candidate = Pairing.parse(link)
         require(pairing == null || pairing!!.key.contentEquals(candidate.key)) { "This preview supports one Mac. You can update its connection address." }
-        BridgeClient(candidate).use { it.call("list") } // Do not replace a working pairing until the peer authenticates.
+        // Test the candidate route before replacing saved pairing or the current connection.
+        try { BridgeClient(candidate).use { it.call("list") } }
+        catch (error: Exception) {
+            if (error is CancellationException) throw error
+            throw PeerRejected(friendly(error, candidate).replace(" Reconnecting automatically.", " Try connecting again."))
+        }
         vault.save(link.trim()); closeConnection(); pairing = candidate
         state.update { it.copy(paired = true, online = false, host = candidate.host, status = "Loading your shelf…") }
     }

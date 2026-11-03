@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.ImeAction
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
+import android.app.Activity
+import android.content.Intent
 import dev.macdroid.app.ui.*
 import kotlinx.coroutines.launch
 import dev.chrisbanes.haze.hazeSource
@@ -65,14 +65,16 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
     LaunchedEffect(state.entries, selectedId) {
         if (selectedId != null && state.entries.none { it.id == selectedId }) selectedId = null
     }
-    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
-        result.contents?.let { scanned -> model.pair(scanned) { pairing = false; link = "" } }
-    }
-    val launchScan: () -> Unit = {
-        scanner.launch(ScanOptions().setCaptureActivity(QrScannerActivity::class.java).setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-            .setOrientationLocked(false).setPrompt("Point your camera at the QR code in Hoppair").setBeepEnabled(false))
+    val scanner = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            if (result.data?.getBooleanExtra(QrScannerActivity.USE_LINK, false) == true) { manual = true; pairing = true }
+            else result.data?.getStringExtra(QrScannerActivity.PAIRING_LINK)?.let { scanned ->
+                model.pair(scanned) { pairing = false; link = "" }
+            }
+        }
     }
     val context = LocalContext.current
+    val launchScan: () -> Unit = { scanner.launch(Intent(context, QrScannerActivity::class.java)) }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) launchScan() else model.cameraDenied()
     }
