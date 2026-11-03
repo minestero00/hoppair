@@ -65,8 +65,7 @@ private val AppTypography = Typography(
 )
 
 @Composable
-internal fun HoppairTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
+internal fun HoppairTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) SideEffect {
         var context = view.context

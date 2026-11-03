@@ -1,12 +1,17 @@
 // Loopback-only sample shelf for the opt-in Android UI gate. Contains no device credentials.
 import net from 'node:net';
 import crypto from 'node:crypto';
+import {readFileSync} from 'node:fs';
 const key=Buffer.alloc(32,7), files=new Map();
 const item=(kind,title,extra={})=>({id:crypto.randomUUID(),kind,title,size:0,source:'Mac',pinned:false,createdAt:Date.now()/1000,...extra});
 const file=item('file','Project brief.txt',{filename:'Project brief.txt',mime:'text/plain',size:24});
 files.set(file.id,Buffer.from('A small preview document'));
+const imageBytes=readFileSync(new URL('./preview.png',import.meta.url));
+const photo=item('file','Coast study.png',{filename:'Coast study.png',mime:'image/png',size:imageBytes.length});
+files.set(photo.id,imageBytes);
 const items=[
  item('text','A few things for tomorrow',{text:'A few things for tomorrow\nPick up the design where you left off. Keep it simple, keep it useful.',pinned:true}),
+ photo,
  file,
  item('link','https://developer.android.com/design',{text:'https://developer.android.com/design'}),
  item('text','Coffee, then a little planning.',{text:'Coffee, then a little planning.'})

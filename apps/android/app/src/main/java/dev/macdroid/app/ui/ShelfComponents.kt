@@ -119,8 +119,10 @@ internal fun ShelfItem(entry: ShelfEntry, onDetails: () -> Unit, onCopy: (String
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Row(Modifier.clickable(onClick = onDetails).padding(start = 16.dp, top = 18.dp, end = 8.dp, bottom = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                Icon(entryIcon(entry), null, tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                ShelfImage(entry) {
+                    Icon(entryIcon(entry), null, tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(entry.title.substringBefore('\n'), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)

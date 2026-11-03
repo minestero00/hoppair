@@ -90,6 +90,13 @@ class ShelfUiTest {
             // ActivityScenario recreates by matching the original launch intent.
             scenario.onActivity { it.intent = checkNotNull(launchIntent) }
             screenshot(screenshots, "shelf-light")
+            tapText("Coast study.png")
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithContentDescription("Preview of Coast study.png").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithContentDescription("Preview of Coast study.png").assertIsDisplayed()
+            screenshot(screenshots, "photo-details")
+            tapDescription("Close")
             tapDescription("Mac connection")
             waitText("Your Mac is saved")
             waitText("Update connection with QR")

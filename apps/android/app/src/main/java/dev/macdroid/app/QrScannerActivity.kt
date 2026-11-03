@@ -110,7 +110,7 @@ class QrScannerActivity : ComponentActivity() {
                     codes.isNotEmpty() -> message = "QR found. Hold steady while the camera adjusts."
                 }
             })
-        setContent { HoppairTheme { ScannerScreen() } }
+        setContent { HoppairTheme(dark = true) { ScannerScreen() } }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             message = "Allow camera access in Settings and reopen this scanner, or use a pairing link."
             return

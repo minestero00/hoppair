@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -113,8 +114,12 @@ internal fun ItemDetailsSheet(entry: ShelfEntry, onCopy: (String) -> Unit, onOpe
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)) {
             SheetHeading(when (entry.kind) { "file" -> "File"; "link" -> "Link"; else -> "Note" }, onDismiss)
-            Box(Modifier.size(56.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
-                Icon(entryIcon(entry), null, Modifier.size(28.dp), tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant)
+            val photo = entry.kind == "file" && entry.json.optString("mime").startsWith("image/")
+            Box((if (photo) Modifier.fillMaxWidth().height(240.dp) else Modifier.size(56.dp))
+                .clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                ShelfImage(entry, detail = true) {
+                    Icon(entryIcon(entry), null, Modifier.size(28.dp), tint = if (entry.kind == "link") ShelfColors.link() else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             SelectionContainer { Text(if (entry.kind == "file") entry.filename else entry.text ?: entry.title, style = MaterialTheme.typography.bodyLarge) }
             Text(if (entry.pending) "Waiting to send · saved on this phone" else entryMetadata(entry),
