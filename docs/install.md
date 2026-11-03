@@ -36,6 +36,8 @@ Configure the optional [relay](relay.md) once, then scan the updated QR. The sam
 
 Pairing is saved securely. Reopen both apps to reconnect automatically; no new QR scan is needed. Keep the Mac awake and both apps open to sync. Pending items remain stored while disconnected.
 
+If you reinstall Hoppair on your Mac or switch Macs, scan the new QR. Android asks before replacing a different saved connection and explains which waiting items will be sent. Canceling or a failed connection check keeps the previous pairing.
+
 Limits: 8 MiB per file, 64 KiB per text item, 500 shelf items. This release targets one Mac and one Android phone. Full shelves reject new items; there is no item deletion or in-app key rotation yet.
 
 ## Updating from MacDroid

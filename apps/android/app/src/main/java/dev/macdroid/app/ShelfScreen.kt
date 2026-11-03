@@ -8,6 +8,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -176,6 +178,19 @@ internal fun HoppairScreen(model: ShelfViewModel, updater: AppUpdateViewModel, o
             onFiles = { attachments = false; onFiles() }, onCamera = { attachments = false; onCamera() }, onDismiss = { attachments = false })
         state.entries.firstOrNull { it.id == selectedId }?.let { entry ->
             ItemDetailsSheet(entry, onCopy = onCopy, onOpen = onOpen, onDismiss = { selectedId = null })
+        }
+        state.replacement?.let { replacement ->
+            AlertDialog(onDismissRequest = model::cancelPairingReplacement,
+                title = { Text("Replace your saved Mac?") },
+                text = {
+                    val waiting = state.entries.count { it.pending }
+                    Text("This QR is from a different Mac or a new installation of Hoppair. Continue only if you opened it on your Mac.\n\n" +
+                        "Connect to ${replacement.host} instead of ${state.peerName}. Items already saved on this phone will stay here." +
+                        (if (waiting > 0) "\n\n$waiting ${if (waiting == 1) "item waiting" else "items waiting"} to send will be shared with this Mac." else ""),
+                        modifier = Modifier.verticalScroll(rememberScrollState()))
+                },
+                confirmButton = { TextButton(onClick = { model.confirmPairingReplacement(replacement.id) }, enabled = !state.busy) { Text("Replace and connect") } },
+                dismissButton = { TextButton(onClick = model::cancelPairingReplacement) { Text("Keep current Mac") } })
         }
         state.error?.let { error ->
             AlertDialog(onDismissRequest = model::clearError, title = { Text("Something needs your attention") }, text = { Text(error) },

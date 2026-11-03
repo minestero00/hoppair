@@ -87,6 +87,18 @@ class ShelfUiTest {
             compose.onNodeWithText("Connect to your Mac?").assertDoesNotExist()
             waitText("Connected to Studio Mac")
             assertArrayEquals(Pairing.parse(checkNotNull(originalPairing)).key, Pairing.parse(checkNotNull(PairingVault(context).load())).key)
+            val replacementLink = "hoppair://10.0.2.2:49273?key=" + android.util.Base64.encodeToString(ByteArray(32) { 8 }, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING)
+            val replacementIntent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(replacementLink))
+                .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            val savedBeforeReplacement = PairingVault(context).load()
+            scenario.onActivity { it.startActivity(replacementIntent) }
+            waitText("Connect to your Mac?")
+            compose.onNodeWithText("Connect", substring = false).performClick()
+            waitText("Replace your saved Mac?")
+            screenshot(screenshots, "replace-connection")
+            tapText("Keep current Mac")
+            compose.onNodeWithText("Replace your saved Mac?").assertDoesNotExist()
+            assertEquals(savedBeforeReplacement, PairingVault(context).load())
             // ActivityScenario recreates by matching the original launch intent.
             scenario.onActivity { it.intent = checkNotNull(launchIntent) }
             screenshot(screenshots, "shelf-light")

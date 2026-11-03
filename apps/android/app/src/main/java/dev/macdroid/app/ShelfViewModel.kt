@@ -17,11 +17,14 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+internal data class PairingReplacement(val id: String, val host: String)
+
 internal data class ShelfState(
     val entries: List<ShelfEntry> = emptyList(), val paired: Boolean = false,
     val online: Boolean = false, val status: String = "Connect your Mac to get started",
     val error: String? = null, val busy: Boolean = false, val cameraRequest: String? = null,
-    val host: String = "", val peerName: String = "Mac", val deviceName: String = "", val defaultDeviceName: String = "Android phone"
+    val host: String = "", val peerName: String = "Mac", val deviceName: String = "", val defaultDeviceName: String = "Android phone",
+    val replacement: PairingReplacement? = null
 )
 
 internal class ShelfViewModel(application: Application) : AndroidViewModel(application) {
@@ -34,6 +37,11 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
     private var pendingOperations = 0
     private val vault = PairingVault(application)
     private var pairing: Pairing? = null
+    private data class PendingPairing(val id: String, val revision: Long, val link: String, val previousKey: ByteArray, val onSuccess: () -> Unit)
+    // Prompt publication/consumption is confined to Main; IO probes check the revision before committing.
+    private val pairingGate = Mutex()
+    private var pendingPairing: PendingPairing? = null
+    private val pairingRevision = java.util.concurrent.atomic.AtomicLong()
     private var syncClient: BridgeClient? = null
     private fun closeConnection() { syncClient?.close(); syncClient = null }
     private fun connection(pair: Pairing) = syncClient ?: BridgeClient(pair).also { syncClient = it }
@@ -73,36 +81,99 @@ internal class ShelfViewModel(application: Application) : AndroidViewModel(appli
     private fun ownName() = state.value.deviceName.trim().ifBlank { defaultName }
     fun cameraDenied() { state.update { it.copy(error = "Camera access is needed to scan a QR code. Allow it in your phone settings or choose “Use a pairing link”.") } }
     fun clearError() { state.update { it.copy(error = null) } }
-    private fun operation(onSuccess: () -> Unit = {}, block: () -> Unit) {
+    private fun operation(onSuccess: () -> Unit = {}, block: suspend () -> Unit) {
         pendingOperations++
         state.update { it.copy(busy = true) }
         viewModelScope.launch {
-            mutex.withLock {
-                state.update { it.copy(busy = true) }
-                try {
+            try {
+                mutex.withLock {
+                    state.update { it.copy(busy = true) }
                     withContext(Dispatchers.IO) {
                         checkNotNull(repository) { "Could not open local storage. Please restart the app." }
-                        block()
-                        state.update { it.copy(entries = repository!!.entries) }
+                        try { block() }
+                        finally { state.update { it.copy(entries = repository!!.entries) } }
                     }
                     onSuccess()
-                } catch (error: Exception) { fail(error) }
-                finally { pendingOperations--; state.update { it.copy(entries = repository?.entries ?: it.entries, busy = pendingOperations > 0) } }
+                }
+            } catch (error: Exception) { fail(error) }
+            finally { pendingOperations--; state.update { it.copy(busy = pendingOperations > 0) } }
+        }
+    }
+    fun pair(link: String, onSuccess: () -> Unit = {}) {
+        viewModelScope.launch {
+            pairingGate.withLock {
+                clearPairingPrompt()
+                val revision = pairingRevision.get()
+                var connected = false
+                operation(onSuccess = { if (connected && revision == pairingRevision.get()) onSuccess() }) {
+                    val candidate = Pairing.parse(link)
+                    val current = pairing
+                    if (current != null && !current.key.contentEquals(candidate.key)) {
+                        withContext(Dispatchers.Main.immediate) {
+                            pairingGate.withLock {
+                                if (revision == pairingRevision.get()) {
+                                    val id = java.util.UUID.randomUUID().toString()
+                                    pendingPairing = PendingPairing(id, revision, link, current.key.copyOf(), onSuccess)
+                                    state.update { it.copy(replacement = PairingReplacement(id, candidate.host), error = null) }
+                                }
+                            }
+                        }
+                    } else {
+                        connected = connectPairing(link, candidate, revision)
+                    }
+                }
             }
         }
     }
-    fun pair(link: String, onSuccess: () -> Unit = {}) = operation(onSuccess) {
-        val candidate = Pairing.parse(link)
-        require(pairing == null || pairing!!.key.contentEquals(candidate.key)) { "This preview supports one Mac. You can update its connection address." }
+    private fun clearPairingPrompt() {
+        pairingRevision.incrementAndGet()
+        pendingPairing = null
+        state.update { it.copy(replacement = null) }
+    }
+    fun cancelPairingReplacement() {
+        viewModelScope.launch { pairingGate.withLock { clearPairingPrompt() } }
+    }
+    fun confirmPairingReplacement(id: String) {
+        viewModelScope.launch {
+            pairingGate.withLock {
+                val request = pendingPairing ?: return@withLock
+                if (request.id != id) return@withLock
+                pendingPairing = null
+                state.update { it.copy(replacement = null) }
+                var connected = false
+                operation(onSuccess = { if (connected && request.revision == pairingRevision.get()) request.onSuccess() }) {
+                    check(pairing?.key?.contentEquals(request.previousKey) == true) { "Your connection changed. Scan the QR code again." }
+                    connected = connectPairing(request.link, Pairing.parse(request.link), request.revision)
+                }
+            }
+        }
+    }
+    private suspend fun connectPairing(link: String, candidate: Pairing, revision: Long): Boolean {
+        if (revision != pairingRevision.get()) return false
+        val context = currentCoroutineContext()
         // Test the candidate route before replacing saved pairing or the current connection.
-        try { BridgeClient(candidate).use { it.call("list") } }
+        val response = try { BridgeClient(candidate).use {
+            it.setCancellationCheck { context.ensureActive() }
+            it.call("list")
+        }.also { repository!!.validateSnapshot(it.getJSONArray("items")) } }
         catch (error: Exception) {
             if (error is CancellationException) throw error
+            if (revision != pairingRevision.get()) return false
             throw PeerRejected(friendly(error, candidate).replace(" Reconnecting automatically.", " Try connecting again."))
         }
-        vault.save(link.trim()); closeConnection(); pairing = candidate
-        state.update { it.copy(paired = true, online = false, host = candidate.host, status = "Loading your shelf…") }
+        // Serialize persistence with prompt cancellation/new requests without blocking Main on disk IO.
+        return pairingGate.withLock {
+            context.ensureActive()
+            if (revision != pairingRevision.get()) return@withLock false
+            vault.save(link.trim()); closeConnection(); pairing = candidate
+            val name = cleanDeviceName(response.optString("deviceName", "Mac")).ifBlank { "Mac" }
+            preferences.edit().putString("peer", name).apply()
+            state.update { it.copy(paired = true, online = false, host = candidate.host, peerName = name, cameraRequest = null,
+                error = null, status = "Loading your shelf…") }
+            true
+        }
     }
+
     fun addText(text: String, onSuccess: () -> Unit = {}) = operation(onSuccess) {
         repository!!.addText(text)
         state.update { it.copy(status = "Queued for transfer") }

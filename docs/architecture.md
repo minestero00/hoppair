@@ -35,7 +35,7 @@ Hoppair was previously named MacDroid. It keeps the original macOS bundle ID, An
 
 ## Camera-to-app handoff
 
-`services/connect/` serves the public Android Digital Asset Links association and redirects uninstalled devices to the static `site/connect/` guide. Pairing credentials stay in the URL fragment, which is not sent in HTTP requests. The guide can open the installed app through an explicit Android Intent or offer the release APK; installation still requires Android's user approval. A new external invite requires an in-app confirmation and cannot replace a different existing Mac pairing.
+`services/connect/` serves the public Android Digital Asset Links association and redirects uninstalled devices to the static `site/connect/` guide. Pairing credentials stay in the URL fragment, which is not sent in HTTP requests. The guide can open the installed app through an explicit Android Intent or offer the release APK; installation still requires Android's user approval. A new external invite requires an in-app confirmation. A different pairing key requires a separate replacement confirmation that explains pending uploads; the candidate is authenticated and its snapshot validated before replacing the saved connection.
 
 There is no account, deferred-install token, or server-side pairing store. After installing an APK, return to the same guide and choose **Open Hoppair**. The built-in scanner decodes invites locally and also works without loading the website.
 
