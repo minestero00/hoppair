@@ -12,14 +12,12 @@ struct ShelfView: View {
     @State private var targeting = false
     @FocusState private var composerFocused: Bool
     private let sections = [("All Items", "square.grid.2x2"), ("Pinned", "pin"), ("Files", "doc"), ("Text & Links", "text.alignleft")]
-    var filtered: [ShelfItem] {
-        model.items.filter { item in
-            (section != "Pinned" || item.pinned) &&
-            (section != "Files" || item.kind == "file") &&
-            (section != "Text & Links" || item.kind != "file") &&
-            (search.isEmpty || "\(item.title) \(item.text ?? "")".localizedCaseInsensitiveContains(search))
-        }.sorted { a, b in a.pinned != b.pinned ? a.pinned : a.createdAt > b.createdAt }
+    @State private var filtered: [ShelfItem] = []
+    @State private var completedSearch: ShelfSearchRequest?
+    private var searchRequest: ShelfSearchRequest {
+        ShelfSearchRequest(items: model.items, query: search, section: section)
     }
+    private var searchReady: Bool { completedSearch == searchRequest }
     var body: some View {
         NavigationSplitView {
             VStack(alignment: .leading, spacing: 24) {
@@ -55,7 +53,7 @@ struct ShelfView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(section).font(.system(size: 25, weight: .semibold))
-                        Text("\(filtered.count) items · From your phone to your Mac, and back.").font(.system(size: 12)).foregroundStyle(HoppairPalette.secondaryText)
+                        Text(searchReady ? "\(filtered.count) items · From your phone to your Mac, and back." : "Searching the shelf…").font(.system(size: 12)).foregroundStyle(HoppairPalette.secondaryText)
                     }
                     Spacer()
                     Button { model.openCommands() } label: { HStack(spacing: 10) { Text("Commands"); Text("⌘K").foregroundStyle(HoppairPalette.secondaryText) }.font(.system(size: 12, weight: .medium)) }.hoppairButton()
@@ -71,7 +69,9 @@ struct ShelfView: View {
                     HStack { Label("Open Hoppair on your phone to confirm the photo request", systemImage: "camera"); Spacer(); Button("Cancel Request") { model.cameraRequest = nil } }
                         .font(.callout).padding(12).background(HoppairPalette.iconSurface, in: RoundedRectangle(cornerRadius: 8)).padding(.horizontal, 24).padding(.top, 12)
                 }
-                if filtered.isEmpty {
+                if filtered.isEmpty && !searchReady {
+                    ProgressView("Searching the shelf…").frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if filtered.isEmpty {
                     VStack(spacing: 14) {
                         Image(systemName: search.isEmpty ? "tray" : "magnifyingglass").font(.system(size: 44, weight: .light)).foregroundStyle(HoppairPalette.secondaryText)
                         Text(emptyTitle).font(.title2.bold())
@@ -81,6 +81,9 @@ struct ShelfView: View {
                     }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(30)
                 } else {
                     ShelfBrowser(items: filtered)
+                        .disabled(!searchReady)
+                        .accessibilityHidden(!searchReady)
+                        .opacity(searchReady ? 1 : 0.55)
                         .padding(.horizontal, 24).padding(.top, 14).padding(.bottom, 18)
                 }
                 Divider()
@@ -112,6 +115,17 @@ struct ShelfView: View {
                 }
                 return !providers.isEmpty
             }
+        }
+        .task(id: searchRequest) {
+            let request = searchRequest
+            do {
+                let result = try await request.results()
+                try Task.checkCancellation()
+                guard request == searchRequest else { return }
+                filtered = result
+                completedSearch = request
+            } catch is CancellationError { }
+            catch { model.error = error.localizedDescription }
         }
         .buttonStyle(HoppairButtonStyle())
         .tint(accent).frame(minWidth: 800, minHeight: 600)
