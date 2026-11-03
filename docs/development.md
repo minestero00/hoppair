@@ -12,7 +12,7 @@ open dist/MacDroid.app
 swift test --package-path apps/macos
 ```
 
-Local builds use ad-hoc signing. Set `MACDROID_SIGN_IDENTITY` to use your own signing identity. Rebuilt development apps may require renewed Keychain approval.
+Quit MacDroid before rebuilding; the script refuses to replace a running app. Local builds use ad-hoc signing. Set `MACDROID_SIGN_IDENTITY` to use your own signing identity. Rebuilt development apps may require renewed Keychain approval.
 
 ## Android
 
@@ -54,7 +54,7 @@ Real-phone QR/camera, LTE, sleep/wake, permissions, accessibility, and battery b
 
 Run `./scripts/test-android-ui.sh emulator-5580` on a disposable emulator for the Android UI gate (Node.js 22+ required). It uses an isolated loopback shelf, checks search/details/attachments, and captures onboarding, light/dark themes, large text, landscape, and tablet layouts under `artifacts/android-ui/`.
 
-After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately identified screenshot app and renders its sample shelf to `artifacts/macos-ui/shelf.png`. It never loads the personal shelf, pairing key, or network services. Set `MACDROID_SCREENSHOT_APPEARANCE=dark` for a dark capture.
+After building the Mac app, `./scripts/capture-mac-ui.sh` creates a separately identified screenshot app and renders its sample shelf to `artifacts/macos-ui/shelf.png`. It never loads the personal shelf, pairing key, or network services. Quit the screenshot app before capturing again. Set `MACDROID_SCREENSHOT_APPEARANCE=dark` for a dark capture.
 
 ## Package a release
 

@@ -5,12 +5,39 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE="$ROOT/dist/MacDroid.app"
 PREVIEW="$ROOT/dist/MacDroid-Screenshots.app"
 OUTPUT="${1:-$ROOT/artifacts/macos-ui/shelf.png}"
+OUTPUT="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "$OUTPUT")"
+python3 - "$PREVIEW/Contents/MacOS/MacDroid" <<'PYCODE'
+import subprocess,sys
+for line in subprocess.check_output(['ps','-axo','pid=,comm='],text=True).splitlines():
+    parts=line.strip().split(None,1)
+    if len(parts)==2 and parts[1]==sys.argv[1]:
+        raise SystemExit('Quit the screenshot app before replacing its bundle and capturing again.')
+PYCODE
 if [[ ! -d "$SOURCE" ]]; then echo 'Build the Mac app first.' >&2; exit 1; fi
-ditto "$SOURCE" "$PREVIEW"
-/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier dev.macdroid.screenshots' "$PREVIEW/Contents/Info.plist"
-codesign --force --sign - "$PREVIEW"
+WORK_DIR="$(mktemp -d "$ROOT/dist/.macdroid-capture.XXXXXX")"
+STAGED="$WORK_DIR/MacDroid-Screenshots.app"
 TEMP_OUTPUT="$OUTPUT.rendering-$$.png"
-trap 'rm -f "$TEMP_OUTPUT"' EXIT
+trap 'rm -f "$TEMP_OUTPUT"; rm -rf "$WORK_DIR"' EXIT
+mkdir -p "$(dirname "$OUTPUT")"
+ditto "$SOURCE" "$STAGED"
+/usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier dev.macdroid.screenshots' "$STAGED/Contents/Info.plist"
+codesign --force --sign - "$STAGED"
+codesign --verify --deep --strict "$STAGED"
+python3 - "$STAGED" "$PREVIEW" "$WORK_DIR/previous.app" <<'PYCODE'
+import os,subprocess,sys
+from pathlib import Path
+staged,final,previous=map(Path,sys.argv[1:])
+for line in subprocess.check_output(['ps','-axo','pid=,comm='],text=True).splitlines():
+    parts=line.strip().split(None,1)
+    if len(parts)==2 and parts[1]==str(final/'Contents/MacOS/MacDroid'):
+        raise SystemExit('Quit the screenshot app before replacing its bundle.')
+if final.exists(): os.replace(final,previous)
+try:
+    os.replace(staged,final)
+except BaseException:
+    if previous.exists(): os.replace(previous,final)
+    raise
+PYCODE
 open -n -a "$PREVIEW" --env "MACDROID_SCREENSHOT_OUTPUT=$TEMP_OUTPUT" --env "MACDROID_SCREENSHOT_APPEARANCE=${MACDROID_SCREENSHOT_APPEARANCE:-light}"
 for ((attempt = 0; attempt < 60; attempt++)); do
     if [[ -s "$TEMP_OUTPUT" ]]; then mv "$TEMP_OUTPUT" "$OUTPUT"; echo "Captured: $OUTPUT"; exit 0; fi

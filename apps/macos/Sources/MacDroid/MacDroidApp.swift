@@ -68,7 +68,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return noErr
         }, 1, &event, Unmanaged.passUnretained(self).toOpaque(), &eventHandler)
         let identifier = EventHotKeyID(signature: 0x4D445244, id: 1)
-        RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | shiftKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
+        let status = RegisterEventHotKey(UInt32(kVK_Space), UInt32(cmdKey | shiftKey), identifier, GetApplicationEventTarget(), 0, &hotKey)
+        if status != noErr { NSLog("MacDroid global shortcut unavailable (status %d).", status) }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { reveal(); return true }

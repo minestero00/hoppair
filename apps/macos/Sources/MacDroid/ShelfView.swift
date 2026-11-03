@@ -15,6 +15,8 @@ struct ShelfView: View {
     @State private var section = "All Items"
     @State private var draft = ""
     @State private var targeting = false
+    @State private var selectedItemID: String?
+    @State private var detailItem: ShelfItem?
     @FocusState private var composerFocused: Bool
     private let sections = [("All Items", "square.grid.2x2"), ("Pinned", "pin"), ("Files", "doc"), ("Text & Links", "text.alignleft")]
     var filtered: [ShelfItem] {
@@ -39,6 +41,7 @@ struct ShelfView: View {
                                 .padding(10).frame(maxWidth: .infinity, alignment: .leading)
                                 .background(section == name ? accent.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
                         }.buttonStyle(.plain).foregroundStyle(section == name ? accent : .primary)
+                            .accessibilityAddTraits(section == name ? .isSelected : [])
                     }
                 }
                 Spacer()
@@ -78,16 +81,30 @@ struct ShelfView: View {
                 if filtered.isEmpty {
                     VStack(spacing: 14) {
                         Image(systemName: search.isEmpty ? "tray" : "magnifyingglass").font(.system(size: 44, weight: .light)).foregroundStyle(accent)
-                        Text(search.isEmpty ? "Add your first item" : "No matching items").font(.title2.bold())
-                        Text(search.isEmpty ? "Drop a file here or write a note below.\nConnect your phone to share items between devices." : "Try another search or category.")
+                        Text(emptyTitle).font(.title2.bold())
+                        Text(emptyMessage)
                             .multilineTextAlignment(.center).foregroundStyle(.secondary)
-                        if search.isEmpty { Button("Connect Phone") { model.showPairing = true }.buttonStyle(.borderedProminent).tint(accent) }
+                        if search.isEmpty && model.items.isEmpty { Button("Connect Phone") { model.showPairing = true }.buttonStyle(.borderedProminent).tint(accent) }
                     }.frame(maxWidth: .infinity, maxHeight: .infinity).padding(30)
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 10) {
-                            ForEach(filtered) { item in itemRow(item) }
-                        }.padding(28).padding(.top, 4)
+                    List(selection: $selectedItemID) {
+                        ForEach(filtered) { item in
+                            ShelfItemRow(item: item, accent: accent,
+                                         onAction: { model.open(item) }, onPin: { model.pin(item) },
+                                         onDetails: { detailItem = item })
+                                .tag(item.id)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                                .listRowSeparatorTint(Color(nsColor: .separatorColor).opacity(0.45))
+                        }
+                    }
+                    .listStyle(.inset).scrollContentBackground(.hidden)
+                    .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(nsColor: .separatorColor).opacity(0.35)))
+                    .padding(.horizontal, 28).padding(.top, 18).padding(.bottom, 20)
+                    .onKeyPress(.return) {
+                        guard let item = filtered.first(where: { $0.id == selectedItemID }) else { return .ignored }
+                        detailItem = item
+                        return .handled
                     }
                 }
                 Divider()
@@ -116,34 +133,31 @@ struct ShelfView: View {
         .tint(accent).frame(minWidth: 800, minHeight: 600)
         .sheet(isPresented: $model.showPairing) { PairingView().environmentObject(model) }
         .sheet(isPresented: $model.showCommands) { commands }
+        .sheet(item: $detailItem) { item in ShelfItemDetails(item: item, onAction: { model.open(item) }) }
         .alert("Could Not Complete the Action", isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })) {
             Button("OK") { model.error = nil }
         } message: { Text(model.error ?? "") }
     }
+    private var emptyTitle: String {
+        if !search.isEmpty { return "No matching items" }
+        switch section {
+        case "Pinned": return "No pinned items"
+        case "Files": return "No files yet"
+        case "Text & Links": return "No notes or links yet"
+        default: return "Add your first item"
+        }
+    }
+    private var emptyMessage: String {
+        if !search.isEmpty { return "Try another search or category." }
+        switch section {
+        case "Pinned": return "Pin an item to keep it within reach here."
+        case "Files": return "Add a file or share one from your phone."
+        case "Text & Links": return "Write a note below, or share a link from your phone."
+        default: return "Drop a file here or write a note below.\nConnect your phone to share items between devices."
+        }
+    }
     private func action(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Label(title, systemImage: symbol).padding(.vertical, 7).frame(maxWidth: .infinity) }.buttonStyle(.bordered)
-    }
-    private func itemRow(_ item: ShelfItem) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: item.kind == "file" ? "doc" : item.kind == "link" ? "link" : "text.alignleft")
-                .font(.title3).foregroundStyle(accent).frame(width: 42, height: 42).background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 10)).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 7) {
-                HStack { Text(item.title).font(.headline).lineLimit(2).textSelection(.enabled); if item.pinned { Image(systemName: "pin.fill").font(.caption).accessibilityLabel("Pinned") } }
-                if let text = item.text, text != item.title { Text(text).font(.callout).foregroundStyle(.secondary).lineLimit(3).textSelection(.enabled) }
-                HStack(spacing: 8) {
-                    Label(item.source, systemImage: item.source == "Mac" ? "laptopcomputer" : "smartphone")
-                    Text("·")
-                    Text(Date(timeIntervalSince1970: item.createdAt), style: .relative)
-                    if item.kind == "file" { Text("·"); Text(ByteCountFormatter.string(fromByteCount: Int64(item.size), countStyle: .file)) }
-                }.font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-            VStack(alignment: .trailing, spacing: 8) {
-                Button { model.pin(item) } label: { Image(systemName: item.pinned ? "pin.slash" : "pin") }.buttonStyle(.borderless).accessibilityLabel(item.pinned ? "Unpin" : "Pin Item")
-                Button(item.kind == "file" ? "Save…" : item.kind == "link" ? "Open" : "Copy") { model.open(item) }.controlSize(.small)
-            }
-        }.padding(16).background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(.separator.opacity(0.35)))
     }
     private var commands: some View {
         VStack(alignment: .leading, spacing: 16) {
