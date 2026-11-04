@@ -2,6 +2,10 @@
 
 Use the repository root for the commands below. Outputs go to `dist/`; test receipts go to `artifacts/`. Both directories are ignored by Git.
 
+## Local cleanup
+
+Keep the current release in `dist/release/<version>/`, its matching `.xcarchive` and notarized export under `dist/`, and release verification receipts in `artifacts/`. Remove older build outputs only after verifying their replacement and checking that no app, build, or test uses them. Never include signing credentials or application data in cleanup. Install daily-use builds in `/Applications` or `~/Applications` before removing their build copies.
+
 ## macOS
 
 Requires Xcode with Swift and Icon Composer's asset compiler, plus Python 3. Tested with Xcode 27.1; `xcrun --find actool` should resolve the asset compiler.

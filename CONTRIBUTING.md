@@ -13,4 +13,4 @@ Keep personal pairing keys, QR screenshots, signing credentials, and local confi
 
 Contributions are provided under the project's [MIT license](LICENSE). Dependencies retain their original licenses.
 
-If you have any questions of this application, send me an mail to superriaco@gmail.com
+Questions? Open an issue or email superriaco@gmail.com.
