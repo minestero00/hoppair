@@ -91,6 +91,8 @@ The packaging command builds both apps and writes a Mac ZIP, signed Android APK,
 
 Set `HOPPAIR_OUTPUT_DIR` to stage the Mac app in a separate directory. Building, notarization and packaging use that same app; the notarization receipt is saved beside it as `notarization.json`. Release archives still go to `dist/release/`. A running app at the selected build path must be quit before rebuilding.
 
+Packaging refuses an existing version directory. Move that directory before retrying, including after a partial failure, so old artifacts cannot enter the new release.
+
 The requested version must match both app builds; mismatches fail before archives can receive incorrect filenames. For a platform-only release, package the changed app separately and use the [feed preparation command](updates.md#release-order) with the unchanged other binary.
 
 For notarized Mac releases, use your own **Developer ID Application** identity. With Xcode's signed-in account:

@@ -53,7 +53,7 @@ struct ShelfView: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(section).font(.system(size: 25, weight: .semibold))
-                        Text(searchReady ? "\(filtered.count) items · From your phone to your Mac, and back." : "Searching the shelf…").font(.system(size: 12)).foregroundStyle(HoppairPalette.secondaryText)
+                        Text(searchReady ? "\(filtered.count) \(filtered.count == 1 ? "item" : "items") · From your phone to your Mac, and back." : "Searching the shelf…").font(.system(size: 12)).foregroundStyle(HoppairPalette.secondaryText)
                     }
                     Spacer()
                     Button { model.openCommands() } label: { HStack(spacing: 10) { Text("Commands"); Text("⌘K").foregroundStyle(HoppairPalette.secondaryText) }.font(.system(size: 12, weight: .medium)) }.hoppairButton()
@@ -129,8 +129,12 @@ struct ShelfView: View {
         }
         .buttonStyle(HoppairButtonStyle())
         .tint(accent).frame(minWidth: 800, minHeight: 600)
-        .sheet(isPresented: $model.showPairing) { PairingView().environmentObject(model).presentationBackground(.clear) }
-        .sheet(isPresented: $model.showCommands) { commands }
+        .sheet(item: $model.activeSheet) { sheet in
+            switch sheet {
+            case .pairing: PairingView().environmentObject(model).presentationBackground(.clear)
+            case .commands: commands
+            }
+        }
         .alert("Delete from the shared shelf?", isPresented: Binding(get: { model.itemToDelete != nil }, set: { if !$0 { model.itemToDelete = nil } }), presenting: model.itemToDelete) { item in
             Button("Cancel", role: .cancel) { model.itemToDelete = nil }
             Button("Delete", role: .destructive) {
@@ -173,7 +177,7 @@ struct ShelfView: View {
             command("Add File…", symbol: "arrow.up.doc") { model.chooseFiles() }
             command("Take a Photo", symbol: "camera") { model.requestCamera() }
             command("Write a Note", symbol: "square.and.pencil") { composerFocused = true }
-            command("Connect Phone", symbol: "link") { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { model.showPairing = true } }
+            command("Connect Phone", symbol: "link") { model.openPairing() }
         }.padding(24).frame(width: 460)
     }
     private func command(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {

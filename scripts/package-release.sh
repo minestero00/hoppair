@@ -6,6 +6,11 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
     echo 'Use a semantic version, such as 0.1.1.' >&2
     exit 1
 fi
+OUTPUT="$ROOT/dist/release/$VERSION"
+if [[ -e "$OUTPUT" ]]; then
+    echo "Release output already exists: $OUTPUT. Move it before packaging again." >&2
+    exit 1
+fi
 OUTPUT_DIR="${HOPPAIR_OUTPUT_DIR:-$ROOT/dist}"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
@@ -34,8 +39,9 @@ match=re.search(r"package: .*?versionName='([^']+)'",badging)
 if not match or match[1] != sys.argv[2]:
     raise SystemExit('The Android version does not match the requested release. Match both app versions before packaging.')
 PY
-OUTPUT="$ROOT/dist/release/$VERSION"
-mkdir -p "$OUTPUT"
+# Recheck after the build: do not mix artifacts with an existing release directory.
+mkdir -p "$(dirname "$OUTPUT")"
+mkdir "$OUTPUT"
 ARCH="$(uname -m)"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUTPUT/Hoppair-$VERSION-macos-$ARCH.zip"
 cp "$ROOT/dist/Hoppair-android-release.apk" "$OUTPUT/Hoppair-$VERSION-android.apk"

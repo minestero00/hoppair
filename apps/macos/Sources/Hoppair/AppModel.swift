@@ -9,6 +9,10 @@ import Network
 
 @MainActor
 final class AppModel: ObservableObject {
+    enum Sheet: String, Identifiable {
+        case pairing, commands
+        var id: String { rawValue }
+    }
     let isScreenshotMode = Bundle.main.bundleIdentifier == "dev.hoppair.screenshots"
     @Published var preparing = true
     @Published var items: [ShelfItem] = []
@@ -32,8 +36,15 @@ final class AppModel: ObservableObject {
     }
     @Published var lastSeen: Date?
     @Published var cameraRequest: String?
-    @Published var showPairing = false
-    @Published var showCommands = false
+    @Published var activeSheet: Sheet?
+    var showPairing: Bool {
+        get { activeSheet == .pairing }
+        set { if newValue { activeSheet = .pairing } else if activeSheet == .pairing { activeSheet = nil } }
+    }
+    var showCommands: Bool {
+        get { activeSheet == .commands }
+        set { if newValue { activeSheet = .commands } else if activeSheet == .commands { activeSheet = nil } }
+    }
     private var store: ShelfStore?
     private var server: BridgeServer?
     private var relayHost: RelayHost?
@@ -117,16 +128,10 @@ final class AppModel: ObservableObject {
         return "{\"\(relayRoom)\":\"\(hash)\"}"
     }
     func openPairing() {
-        if showCommands {
-            showCommands = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showPairing = true }
-        } else { showPairing = true }
+        activeSheet = .pairing
     }
     func openCommands() {
-        if showPairing {
-            showPairing = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showCommands = true }
-        } else { showCommands = true }
+        activeSheet = .commands
     }
     @discardableResult func configureRelay(_ input: String? = nil) -> String? {
         guard !isScreenshotMode else { return nil }
