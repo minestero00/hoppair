@@ -67,16 +67,22 @@ class RelayBackpressureTest {
                 }
             } catch (error: Throwable) { failure.set(error) }
         }
+        var primaryFailure: Throwable? = null
         try {
             val item = JSONObject().put("id", UUID.randomUUID().toString()).put("kind", "file").put("title", "Fixture")
             BridgeClient(Pairing("127.0.0.1", 1, key, "ws://127.0.0.1:${server.localPort}")).use {
                 assertTrue(it.call("put", item, ByteArray(MAX_FILE)).getBoolean("ok"))
             }
+        } catch (error: Throwable) {
+            primaryFailure = error
+            throw error
         } finally {
             server.close()
             worker.join(25000)
             assertFalse("Fixture peer did not stop", worker.isAlive)
-            failure.get()?.let { throw AssertionError("Fixture peer failed", it) }
+            failure.get()?.let { error ->
+                primaryFailure?.addSuppressed(error) ?: throw AssertionError("Fixture peer failed", error)
+            }
         }
     }
 }

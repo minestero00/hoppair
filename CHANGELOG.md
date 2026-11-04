@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/minestero00/hoppair/releases/tag/v0.1.11) — 2026-11-04
+
+- Remove the small Android TCP receive-buffer override that can stall relay downloads on higher-latency networks. Frame and message size limits remain enforced.
+- Mac remains at v0.1.10 (build 22); no Mac update is required for this fix.
+
+**Validation:** the same encrypted 1.9 MB file through the production relay did not complete within 45 seconds with the old buffer setting, and completed in 3.54 seconds with the system default using the Android transport library on macOS. Android release unit tests and lint passed, along with 11 emulator transport/security checks. Physical Galaxy/LTE confirmation is still required.
+
 ## [0.1.10](https://github.com/minestero00/hoppair/releases/tag/v0.1.10) — 2026-11-04
 
 - Improve Android QR scanning with higher-resolution analysis, an aligned viewfinder, and more room in landscape.

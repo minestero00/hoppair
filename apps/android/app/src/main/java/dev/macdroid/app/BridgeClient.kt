@@ -269,7 +269,8 @@ private class RelaySocket(pairing: Pairing) : java.io.Closeable {
                 parameters.endpointIdentificationAlgorithm = "HTTPS"
             }
         }
-        socket.setReceiveBufferSize(8192)
+        // Keep the OS TCP receive window: forcing 8 KiB stalls large replies on WAN links.
+        // The library uses a fixed default read batch; BoundedRelayDraft limits frame/assembly memory.
         socket.setConnectionLostTimeout(0) // No automatic PING queue; every request has a 15-second response deadline.
         socket.setDaemon(true)
         socket.connect()

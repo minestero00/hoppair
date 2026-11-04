@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "dev.macdroid.app"
     compileSdk = 36
-    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 11; versionName = "0.1.10"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig { applicationId = "dev.macdroid.app"; minSdk = 28; targetSdk = 36; versionCode = 12; versionName = "0.1.11"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
     val signingPath = providers.environmentVariable("HOPPAIR_ANDROID_SIGNING_FILE").orNull
         ?: providers.environmentVariable("MACDROID_ANDROID_SIGNING_FILE").orNull
     if (signingPath != null) {

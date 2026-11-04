@@ -7,14 +7,14 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <description>Stable Hoppair releases for macOS.</description>
     <item>
       <title>Hoppair 0.1.10</title>
-      <pubDate>Wed, 04 Nov 2026 01:36:06 GMT</pubDate>
-      <link>https://github.com/minestero00/hoppair/releases/tag/v0.1.10</link>
+      <pubDate>Wed, 04 Nov 2026 02:38:17 GMT</pubDate>
+      <link>https://github.com/minestero00/hoppair/releases/tag/v0.1.11</link>
       <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
       <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-      <enclosure url="https://github.com/minestero00/hoppair/releases/download/v0.1.10/Hoppair-0.1.10-macos-arm64.zip" length="3228984" type="application/octet-stream" sparkle:version="22" sparkle:shortVersionString="0.1.10" sparkle:edSignature="VWd7novIAth6Ek81iOXTX4/E7cEXaKkl6qDPKz85owWJqwX/yyd8UgqnYYWuPhBYkMfhAciMNN1i4kGaLJ+xAg=="></enclosure>
+      <enclosure url="https://github.com/minestero00/hoppair/releases/download/v0.1.11/Hoppair-0.1.10-macos-arm64.zip" length="3228984" type="application/octet-stream" sparkle:version="22" sparkle:shortVersionString="0.1.10" sparkle:edSignature="VWd7novIAth6Ek81iOXTX4/E7cEXaKkl6qDPKz85owWJqwX/yyd8UgqnYYWuPhBYkMfhAciMNN1i4kGaLJ+xAg=="></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: W5yBhWihifpQeysnwpNYnamSZREj7Qt/obwJ0tIw/s3aeR6gs4fTq0msLarj//Ga+29VOz9lqHj1KXiizMJvBQ==
+edSignature: vq0RmAs4Ks4qmqPeo/qk9Pb7EyKErSKeGkzLxbrnqOiE+FKyd9WjetMDfw4Va1SUBBcOC6UflWaY6xgaWPfSDQ==
 length: 1254
 -->
