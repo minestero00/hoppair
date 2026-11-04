@@ -24,7 +24,7 @@ python3 scripts/prepare-update-feeds.py 0.1.6 \
 
 The script verifies notarization, bundle identity, public key, architecture, APK signature/association and package metadata. It derives sizes, hashes, platform versions, and build numbers from the artifacts. It signs the ZIP and `site/appcast.xml` through Sparkle's Keychain tool and updates `site/release.json`. **Editing signed XML invalidates its signature.** Re-run the script after any change.
 
-4. Update static download links on both site pages. Commit source and feeds; publish a GitHub release with the exact ZIP/APK and `SHA256SUMS.txt`. Then run `./scripts/deploy-pages.sh` from the clean checkout. Publish assets before feeds advertise them.
+4. Finalize the version's entry in [CHANGELOG.md](../CHANGELOG.md), replacing **Unreleased** with the release date and updating validation notes. Use that entry as the GitHub release description. Update static download links on both site pages. Commit source and feeds; publish a GitHub release with the exact ZIP/APK and `SHA256SUMS.txt`. Then run `./scripts/deploy-pages.sh` from the clean checkout. Publish assets before feeds advertise them.
 5. Download the public files again and check their hashes, APK signer, Mac signature/notarization, and signed appcast. Test upgrading an existing installation with shelf/pairing data. A successful build alone is not update-install evidence.
 
 `release.json.version` identifies the GitHub release batch. Android's `android.versionName` and `versionCode`, and Mac's appcast version/build, identify each actual binary. A platform-only release can reuse the other platform's unchanged binary.

@@ -18,7 +18,7 @@ Previously published here as MacDroid. Existing installations can [update withou
 
 [Website and app screenshots](https://minestero00.github.io/hoppair/)
 
-[Download apps](https://github.com/minestero00/hoppair/releases) · [Install and pair](docs/install.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md) · [Security](docs/security.md)
+[Download apps](https://github.com/minestero00/hoppair/releases) · [Install and pair](docs/install.md) · [Changelog](CHANGELOG.md) · [Build and test](docs/development.md) · [Set up a relay](docs/relay.md) · [Security](docs/security.md)
 
 ## Repository
 
